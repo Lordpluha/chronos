@@ -37,6 +37,7 @@
 ### DevOps
 - Docker
 - turborepo
+- .env
 
 ## Components
 
