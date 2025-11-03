@@ -11,6 +11,7 @@
 - Shadcn (Radix UI + TailwindCSS)
 - Motion
 - Nuqs
+- Feature Sliced Design
 - Biome
 
 ### Back
@@ -23,6 +24,7 @@
 - 2FA (speakeasy)
 - Rate-limitting
 - googleapis
+- google calendar api
 - nodemailer
 - Biome
 
