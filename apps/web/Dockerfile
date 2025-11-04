@@ -1,7 +1,7 @@
-FROM node:18-alpine AS base
+# Dockerfile для Vite + React приложения в монорепозитории с использованием Turborepo
+# Базовый образ с Node.js 18 на Alpine Linux
 
-# This Dockerfile is copy-pasted into our main docs at /docs/handbook/deploying-with-docker.
-# Make sure you update both files!
+FROM node:18-alpine AS base
 
 FROM base AS builder
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -9,9 +9,9 @@ RUN apk update
 RUN apk add --no-cache libc6-compat
 # Set working directory
 WORKDIR /app
-RUN yarn global add turbo
+RUN npm install -g turbo
 COPY . .
-RUN turbo prune web --docker
+RUN turbo prune chronos-web --docker
 
 # Add lockfile and package.json's of isolated subworkspace
 FROM base AS installer
@@ -21,7 +21,7 @@ WORKDIR /app
 
 # First install the dependencies (as they change less often)
 COPY --from=builder /app/out/json/ .
-RUN yarn install
+RUN npm ci
 
 # Build the project
 COPY --from=builder /app/out/full/ .
@@ -33,20 +33,17 @@ COPY --from=builder /app/out/full/ .
 # ARG TURBO_TOKEN
 # ENV TURBO_TOKEN=$TURBO_TOKEN
 
-RUN yarn turbo build
+RUN npm run build --workspace=chronos-web
 
-FROM base AS runner
-WORKDIR /app
+FROM nginx:alpine AS runner
 
-# Don't run production as root
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-USER nextjs
+# Copy built assets to nginx
+COPY --from=installer /app/apps/web/dist /usr/share/nginx/html
 
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=installer --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=installer --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+# Copy nginx configuration if you have one
+# COPY --from=installer /app/apps/web/nginx.conf /etc/nginx/nginx.conf
 
-CMD node apps/web/server.js
+# Expose port 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

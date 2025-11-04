@@ -1,0 +1,68 @@
+# Production docker-compose for MongoDB Atlas
+services:
+  web:
+    container_name: chronos-web-prod
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "${FRONT_PORT:-80}:80"
+    networks:
+      - app_network
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  api:
+    container_name: chronos-api-prod
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+      target: runner
+    restart: unless-stopped
+    ports:
+      - "${BACK_PORT:-3001}:${BACK_PORT:-3001}"
+    environment:
+      - NODE_ENV=production
+      - BACK_PORT=${BACK_PORT:-3001}
+      - BACK_HOST=0.0.0.0
+      - FRONT_HOST=${FRONT_HOST}
+      - FRONT_PORT=${FRONT_PORT:-80}
+      # MongoDB Atlas connection string (must include credentials)
+      - MONGODB_URI=${MONGODB_ATLAS_URI}
+      - DB_NAME=${DB_NAME:-chronos}
+      # Security
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
+      - REFRESH_TOKEN_LIFETIME=${REFRESH_TOKEN_LIFETIME:-7d}
+      - ACCESS_TOKEN_NAME=${ACCESS_TOKEN_NAME:-access_token}
+      - REFRESH_TOKEN_NAME=${REFRESH_TOKEN_NAME:-refresh_token}
+      # Email service
+      - CODE_LIFETIME=${CODE_LIFETIME:-5m}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      # OAuth
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${BACK_PORT:-3001}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Network for service communication
+networks:
+  app_network:
+    driver: bridge

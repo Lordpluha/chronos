@@ -1,18 +1,24 @@
 {
-  "name": "with-docker",
+  "name": "chronos",
   "version": "0.0.0",
   "private": true,
   "scripts": {
     "build": "turbo run build",
     "clean": "turbo run clean",
     "dev": "turbo run dev",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "format": "turbo run format",
     "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "docker:dev": "docker compose --profile development up --build",
+    "docker:dev-atlas": "docker compose --env-file .env.atlas up api web --build",
+    "docker:prod": "docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d",
+    "docker:build": "docker compose build",
+    "docker:clean": "docker compose down -v && docker system prune -f",
+    "docker:logs": "docker compose logs -f",
+    "docker:db": "docker compose --profile development up mongodb -d"
   },
   "dependencies": {},
   "devDependencies": {
-    "prettier": "^3.2.5",
     "turbo": "^2.6.0"
   },
   "engines": {

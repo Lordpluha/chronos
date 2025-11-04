@@ -1,7 +1,6 @@
 FROM node:18-alpine AS base
 
-# The web Dockerfile is copy-pasted into our main docs at /docs/handbook/deploying-with-docker.
-# Make sure you update this Dockerfile, the Dockerfile in the web workspace and copy that over to Dockerfile in the docs.
+# Dockerfile для API Express.js приложения в монорепозитории с Turborepo
 
 FROM base AS builder
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -9,7 +8,7 @@ RUN apk update
 RUN apk add --no-cache libc6-compat
 # Set working directory
 WORKDIR /app
-RUN yarn global add turbo
+RUN npm install -g turbo
 COPY . .
 RUN turbo prune api --docker
 
@@ -21,9 +20,9 @@ WORKDIR /app
 
 # First install dependencies (as they change less often)
 COPY --from=builder /app/out/json/ .
-RUN yarn install
+RUN npm ci --only=production
 
-# Build the project and its dependencies
+# Copy source code
 COPY --from=builder /app/out/full/ .
 
 # Uncomment and use build args to enable remote caching
@@ -33,15 +32,20 @@ COPY --from=builder /app/out/full/ .
 # ARG TURBO_TOKEN
 # ENV TURBO_TOKEN=$TURBO_TOKEN
 
-RUN yarn turbo build
-
 FROM base AS runner
 WORKDIR /app
 
 # Don't run production as root
 RUN addgroup --system --gid 1001 expressjs
 RUN adduser --system --uid 1001 expressjs
-USER expressjs
-COPY --from=installer /app .
 
-CMD node apps/api/dist/index.js
+# Copy the application files
+COPY --from=installer --chown=expressjs:expressjs /app/apps/api ./
+COPY --from=installer --chown=expressjs:expressjs /app/node_modules ./node_modules
+
+USER expressjs
+
+# Expose the port that the app runs on
+EXPOSE 3001
+
+CMD ["node", "src/index.js"]

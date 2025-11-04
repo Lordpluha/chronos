@@ -1,29 +1,80 @@
-version: "3"
-
 services:
   web:
-    container_name: web
+    container_name: chronos-web
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile
     restart: always
     ports:
-      - 3000:3000
+      - "${FRONT_PORT:-3000}:80"
     networks:
       - app_network
+    depends_on:
+      - api
+
   api:
-    container_name: api
+    container_name: chronos-api
     build:
       context: .
       dockerfile: ./apps/api/Dockerfile
     restart: always
     ports:
-      - 3001:3001
+      - "${BACK_PORT:-3001}:${BACK_PORT:-3001}"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - BACK_PORT=${BACK_PORT:-3001}
+      - BACK_HOST=${BACK_HOST:-0.0.0.0}
+      - FRONT_HOST=${FRONT_HOST:-localhost}
+      - FRONT_PORT=${FRONT_PORT:-3000}
+      # MongoDB Atlas URI (production) or local MongoDB (development)
+      - MONGODB_URI=${MONGODB_URI}
+      - DB_NAME=${DB_NAME:-chronos}
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
+      - REFRESH_TOKEN_LIFETIME=${REFRESH_TOKEN_LIFETIME:-7d}
+      - ACCESS_TOKEN_NAME=${ACCESS_TOKEN_NAME:-access_token}
+      - REFRESH_TOKEN_NAME=${REFRESH_TOKEN_NAME:-refresh_token}
+      - CODE_LIFETIME=${CODE_LIFETIME:-5m}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
     networks:
       - app_network
+    # Only depend on local MongoDB in development
+    depends_on:
+      - mongodb
+
+  # Local MongoDB for development only
+  # In production, this service is not used (Atlas is used instead)
+  mongodb:
+    container_name: chronos-mongodb
+    image: mongo:7.0
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-admin_password}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-chronos}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      # Optional: Only mount if you want to create initial users/collections
+      # - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - app_network
+    profiles:
+      - development  # Only start in development profile
 
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
 networks:
   app_network:
-    external: true
+    driver: bridge
+
+# Volumes for persistent data
+volumes:
+  mongodb_data:

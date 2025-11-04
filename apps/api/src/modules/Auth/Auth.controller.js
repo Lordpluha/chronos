@@ -1,0 +1,382 @@
+import { Router } from 'express'
+
+import {
+  TOKEN_REFRESHED,
+  USER_LOGGED_IN,
+  USER_LOGGED_OUT,
+  USER_REGISTERED,
+} from '../../messages/index.js'
+import {
+  requireAccessToken,
+  requireRefreshToken,
+} from '../../middleware/index.js'
+import { JWTUtils, validateBody, validateParams } from '../../utils/index.js'
+
+import { authService } from './Auth.service.js'
+import {
+  disable2FASchema,
+  enable2FASchema,
+  loginWith2FASchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
+  registerSchema,
+  resetCodeParamSchema,
+  setup2FASchema,
+  verify2FASchema,
+} from './Auth.validation.js'
+
+const router = Router()
+
+router.post(
+  '/auth/registration',
+  validateBody(registerSchema),
+  async (req, res) => {
+    try {
+      await authService.register(req.body)
+      return res.status(201).json({ message: USER_REGISTERED })
+    } catch (err) {
+      res = JWTUtils.clearHttpOnlyCookie(res)
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+router.post(
+  '/auth/login',
+  validateBody(loginWith2FASchema),
+  async (req, res) => {
+    try {
+      const { access_token, refresh_token } = await authService.login(req.body)
+      res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
+      return res.json({ message: USER_LOGGED_IN })
+    } catch (err) {
+      res = JWTUtils.clearHttpOnlyCookie(res)
+
+      // Если требуется 2FA, возвращаем специальный статус
+      if (err.requires2FA) {
+        return res.status(422).json({
+          message: err.message,
+          requires2FA: true,
+        })
+      }
+
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+router.post('/auth/refresh', requireRefreshToken, async (req, res) => {
+  try {
+    const { access, refresh } = await authService.refresh(req.refreshCookie)
+    res = JWTUtils.generateHttpOnlyCookie(res, access, refresh)
+
+    return res.json({
+      message: TOKEN_REFRESHED,
+    })
+  } catch (err) {
+    res = JWTUtils.clearHttpOnlyCookie(res)
+    return res.status(err.status || 401).json({ message: err.message })
+  }
+})
+
+router.post('/auth/logout', requireAccessToken, async (req, res) => {
+  try {
+    await authService.logout(req.accessCookie)
+    res = JWTUtils.clearHttpOnlyCookie(res)
+    return res.json({ message: USER_LOGGED_OUT })
+  } catch (err) {
+    return res.status(500).json({ message: err.message })
+  }
+})
+
+router.post(
+  '/auth/password-reset',
+  validateBody(passwordResetRequestSchema),
+  async (req, res) => {
+    try {
+      await authService.sendCode(req.accessCookie, req.body)
+      return res.json({ message: 'Code was sended to your email' })
+    } catch (err) {
+      return res.status(400).json({ message: err.message })
+    }
+  },
+)
+
+router.post(
+  '/auth/password-reset/:token',
+  validateParams(resetCodeParamSchema),
+  validateBody(passwordResetSchema),
+  async (req, res) => {
+    try {
+      await authService.resetPassword(req.params.token, req.body)
+      return res.json({ message: 'Password reset successfully' })
+    } catch (err) {
+      return res.status(400).json({ message: err.message })
+    }
+  },
+)
+
+// Google OAuth routes
+router.get('/auth/google', async (req, res) => {
+  try {
+    console.log('🚀 Initiating Google OAuth...')
+
+    // Генерируем state для защиты от CSRF
+    const state = Math.random().toString(36).substring(2, 15)
+    console.log('🔐 Generated state:', state)
+
+    // Сохраняем state в cookie для проверки в callback
+    res.cookie('oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 10 * 60 * 1000, // 10 минут
+      sameSite: 'lax',
+    })
+
+    const authUrl = authService.getGoogleAuthUrl(state)
+    console.log('🔗 Redirecting to Google Auth URL:', authUrl)
+    return res.redirect(authUrl)
+  } catch (err) {
+    console.error('❌ Google OAuth initiation error:', err)
+    return res
+      .status(500)
+      .json({ message: 'Failed to initiate Google authentication' })
+  }
+})
+
+// Хранилище использованных кодов (в продакшене используйте Redis или БД)
+const usedCodes = new Set()
+
+router.get('/auth/google/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query
+
+    console.log('📥 Google OAuth Callback received:')
+    console.log(
+      '  Code:',
+      code ? `Present (${code.substring(0, 10)}...)` : 'Missing',
+    )
+    console.log('  State from query:', state)
+    console.log('  Error:', error)
+    console.log('  Request URL:', req.originalUrl)
+
+    // Проверяем наличие ошибки от Google
+    if (error) {
+      console.log('❌ Google OAuth error:', error)
+      return res.status(400).json({ message: `Google OAuth error: ${error}` })
+    }
+
+    // Проверяем наличие кода
+    if (!code) {
+      console.log('❌ Authorization code not provided')
+      return res
+        .status(400)
+        .json({ message: 'Authorization code not provided' })
+    }
+
+    // Проверяем, не был ли код уже использован
+    if (usedCodes.has(code)) {
+      console.log('❌ Authorization code has already been used')
+      return res
+        .status(400)
+        .json({ message: 'Authorization code has already been used' })
+    }
+
+    // Добавляем код в список использованных
+    usedCodes.add(code)
+
+    // Очищаем старые коды (оставляем только последние 100)
+    if (usedCodes.size > 100) {
+      const codes = Array.from(usedCodes)
+      usedCodes.clear()
+      codes.slice(-50).forEach((c) => {
+        usedCodes.add(c)
+      })
+    }
+
+    console.log('🔄 Processing Google OAuth callback...')
+
+    // Обрабатываем callback и получаем токены
+    const { access_token, refresh_token } =
+      await authService.handleGoogleCallback(code, state)
+
+    // Устанавливаем токены в cookies
+    res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
+
+    // Перенаправляем на фронтенд
+    const frontendUrl =
+      process.env.NODE_ENV === 'production'
+        ? `https://${process.env.FRONT_HOST}`
+        : `http://${process.env.FRONT_HOST}:${process.env.FRONT_PORT}`
+
+    console.log(
+      '✅ Google OAuth successful, redirecting to:',
+      `${frontendUrl}/profile`,
+    )
+    return res.redirect(`${frontendUrl}/profile`)
+  } catch (err) {
+    console.error('❌ Google OAuth callback error:', err)
+
+    // Удаляем код из использованных, если произошла ошибка
+    if (req.query.code) {
+      usedCodes.delete(req.query.code)
+    }
+
+    const frontendUrl =
+      process.env.NODE_ENV === 'production'
+        ? 'https://your-frontend-domain.com'
+        : `file:///home/lordpluha/develop/Campus/vtesliuk-6096`
+
+    return res.redirect(
+      `${frontendUrl}/auth-error.html?message=${encodeURIComponent(err.message)}`,
+    )
+  }
+})
+
+// GET /auth/me - получить информацию о текущем пользователе
+router.get('/auth/me', requireAccessToken, async (req, res) => {
+  try {
+    const userId = req.userId
+    const user = await authService.getUserById(userId)
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    // Возвращаем информацию о пользователе без пароля
+    const userInfo = {
+      id: user.id,
+      login: user.login,
+      email: user.email,
+      full_name: user.full_name,
+      avatar: user.avatar,
+      description: user.description,
+      rating: user.rating,
+      role: user.role,
+      created_at: user.created_at,
+      google_id: user.google_id,
+      email_verified: user.email_verified,
+      is_2fa_enabled: user.is_2fa_enabled,
+    }
+
+    return res.json(userInfo)
+  } catch (err) {
+    console.error('❌ Error getting user info:', err)
+    return res.status(500).json({ message: 'Failed to get user information' })
+  }
+})
+
+// 2FA Routes
+
+// Настройка 2FA - получение QR кода
+router.post(
+  '/auth/2fa/setup',
+  requireAccessToken,
+  validateBody(setup2FASchema),
+  async (req, res) => {
+    try {
+      const userId = req.userId
+      const { password } = req.body
+
+      const result = await authService.setup2FA(userId, password)
+
+      return res.json({
+        message: '2FA setup initiated',
+        secret: result.secret,
+        qrCode: result.qrCode,
+        manualEntryKey: result.manualEntryKey,
+      })
+    } catch (err) {
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+// Включение 2FA после верификации
+router.post(
+  '/auth/2fa/enable',
+  requireAccessToken,
+  validateBody(enable2FASchema),
+  async (req, res) => {
+    try {
+      const userId = req.userId
+      const { token, password } = req.body
+
+      const backupCodes = await authService.enable2FA(userId, token, password)
+
+      return res.json({
+        message: '2FA enabled successfully',
+        backupCodes: backupCodes,
+      })
+    } catch (err) {
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+// Отключение 2FA
+router.post(
+  '/auth/2fa/disable',
+  requireAccessToken,
+  validateBody(disable2FASchema),
+  async (req, res) => {
+    try {
+      const userId = req.userId
+      const { password } = req.body
+
+      await authService.disable2FA(userId, password)
+
+      return res.json({
+        message: '2FA disabled successfully',
+      })
+    } catch (err) {
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+// Проверка 2FA токена (для отдельной верификации)
+router.post(
+  '/auth/2fa/verify',
+  requireAccessToken,
+  validateBody(verify2FASchema),
+  async (req, res) => {
+    try {
+      const userId = req.userId
+      const { token } = req.body
+
+      const isValid = await authService.verify2FAToken(userId, token)
+
+      if (isValid) {
+        return res.json({
+          message: '2FA token is valid',
+          valid: true,
+        })
+      } else {
+        return res.status(401).json({
+          message: 'Invalid 2FA token',
+          valid: false,
+        })
+      }
+    } catch (err) {
+      return res.status(err.status || 400).json({ message: err.message })
+    }
+  },
+)
+
+// Получить статус 2FA
+router.get('/auth/2fa/status', requireAccessToken, async (req, res) => {
+  try {
+    const userId = req.userId
+    const status = await authService.get2FAStatus(userId)
+
+    return res.json({
+      message: '2FA status retrieved',
+      ...status,
+    })
+  } catch (err) {
+    return res.status(err.status || 400).json({ message: err.message })
+  }
+})
+
+export { router as AuthRouter }
