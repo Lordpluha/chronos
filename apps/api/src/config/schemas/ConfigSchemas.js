@@ -91,7 +91,7 @@ export function getJwtSchema() {
  * Схема для email настроек
  */
 export function getEmailSchema() {
-  const { emailSchema, lifetimeSchema } = createCommonSchemas()
+  const { lifetimeSchema } = createCommonSchemas()
 
   // Специальная схема для SMTP портов (может быть меньше 1000)
   const smtpPortSchema = z
@@ -105,7 +105,7 @@ export function getEmailSchema() {
   return z.object({
     SMTP_HOST: z.string().min(1, 'SMTP host is required'),
     SMTP_PORT: smtpPortSchema,
-    SMTP_USER: emailSchema,
+    SMTP_USER: z.string().min(1, 'SMTP password is required'),
     SMTP_PASS: z.string().min(1, 'SMTP password is required'),
     CODE_LIFETIME: lifetimeSchema.default('15m'),
   })
