@@ -3,7 +3,7 @@ import argon2 from 'argon2'
 
 const userSchema = new mongoose.Schema(
   {
-    username: {
+    login: {
       type: String,
       required: true,
       unique: true,
@@ -11,83 +11,54 @@ const userSchema = new mongoose.Schema(
       minlength: 3,
       maxlength: 30,
     },
-    email: {
+    full_name: {
       type: String,
       required: true,
-      unique: true,
-      lowercase: true,
       trim: true,
+      maxlength: 100,
     },
-    password: {
+    password_hash: {
       type: String,
       required: function () {
-        // Password is required only if googleId is not present
-        return !this.googleId
+        // Password is required only if google_id is not present
+        return !this.google_id
       },
       minlength: 6,
     },
-    firstName: {
-      type: String,
-      trim: true,
-      maxlength: 50,
+    is_email_verified: {
+      type: Boolean,
+      default: false,
     },
-    lastName: {
+    task_lists: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'TaskList',
+      },
+    ],
+    google_id: {
       type: String,
-      trim: true,
-      maxlength: 50,
-    },
-    fullName: {
-      type: String,
-      trim: true,
-      maxlength: 100,
+      sparse: true,
+      unique: true,
     },
     avatar: {
       type: String,
       default: null,
     },
-    description: {
-      type: String,
-      maxlength: 500,
-      default: null,
-    },
-    rating: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-    role: {
-      type: String,
-      enum: ['user', 'admin', 'moderator'],
-      default: 'user',
-    },
-    twoFactorEnabled: {
-      type: Boolean,
-      default: false,
-    },
-    googleId: {
-      type: String,
-      sparse: true,
-      unique: true,
-    },
-    lastLoginAt: {
-      type: Date,
-      default: null,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    calendars: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Calendar',
+      },
+    ],
   },
   {
-    timestamps: true,
+    timestamps: {
+      createdAt: 'created',
+      updatedAt: 'updated',
+    },
     toJSON: {
       transform: (_doc, ret) => {
-        delete ret.password
-        delete ret.twoFactorSecret
+        delete ret.password_hash
         return ret
       },
     },
@@ -96,10 +67,10 @@ const userSchema = new mongoose.Schema(
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next()
+  if (!this.isModified('password_hash')) return next()
 
   try {
-    this.password = await argon2.hash(this.password)
+    this.password_hash = await argon2.hash(this.password_hash)
     next()
   } catch (error) {
     next(error)
@@ -109,17 +80,15 @@ userSchema.pre('save', async function (next) {
 // Instance method to check password
 userSchema.methods.checkPassword = async function (candidatePassword) {
   try {
-    return await argon2.verify(this.password, candidatePassword)
+    return await argon2.verify(this.password_hash, candidatePassword)
   } catch {
     return false
   }
 }
 
-// Static method to find by email or username
-userSchema.statics.findByEmailOrUsername = function (identifier) {
-  return this.findOne({
-    $or: [{ email: identifier.toLowerCase() }, { username: identifier }],
-  })
+// Static method to find by login
+userSchema.statics.findByLogin = function (login) {
+  return this.findOne({ login: login })
 }
 
 export const User = mongoose.model('User', userSchema)

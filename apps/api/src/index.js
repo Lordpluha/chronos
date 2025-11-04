@@ -4,10 +4,7 @@ import express from 'express'
 import { AppConfig } from './config/index.js'
 import { connectMongoose } from './db/database.js'
 import { router } from './modules/index.js'
-import {
-  createDefaultAdmin,
-  initializeDatabase,
-} from './utils/database-init.js'
+import { initializeDatabase } from './utils/database-init.js'
 
 const app = express()
 
@@ -49,7 +46,6 @@ async function startServer() {
 
     // Initialize database indexes and admin user
     await initializeDatabase()
-    await createDefaultAdmin()
 
     app.listen(AppConfig.PORT, () => {
       console.log(`🚀 Server is running on port ${AppConfig.PORT}`)

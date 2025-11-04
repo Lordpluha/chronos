@@ -3,8 +3,8 @@ import speakeasy from 'speakeasy'
 import { AppConfig } from '../../config/index.js'
 import { User } from '../../models/User.js'
 import { Session } from '../../models/Session.js'
-import { PasswordReset } from '../../models/PasswordReset.js'
-import { UserTotp } from '../../models/UserTotp.js'
+import { PasswordResetOtp } from '../../models/PasswordResetOtp.js'
+import { RegistrationTotp } from '../../models/RegistrationTotp.js'
 import {
   INVALID_OR_EXPIRED_CODE,
   INVALID_USERNAME_OR_PASSWORD,
@@ -174,7 +174,7 @@ class AuthService {
     )
 
     // Create password reset record
-    const passwordReset = new PasswordReset({
+    const passwordReset = new PasswordResetOtp({
       email: body.email,
       code: code,
       expiresAt: expiresAt,
@@ -191,7 +191,7 @@ class AuthService {
    */
   async resetPassword(code, { password }) {
     // Find valid password reset record
-    const resetRecord = await PasswordReset.findOne({
+    const resetRecord = await PasswordResetOtp.findOne({
       code: code,
       used: false,
       expiresAt: { $gt: new Date() },
@@ -371,7 +371,7 @@ class AuthService {
     })
 
     // Save or update TOTP record (but don't enable yet)
-    await UserTotp.findOneAndUpdate(
+    await RegistrationTotp.findOneAndUpdate(
       { userId },
       {
         secretKey: secret.base32,
@@ -414,7 +414,7 @@ class AuthService {
     }
 
     // Get TOTP record
-    const totpRecord = await UserTotp.findOne({ userId })
+    const totpRecord = await RegistrationTotp.findOne({ userId })
     if (!totpRecord) {
       const err = new Error('2FA not set up. Please run setup first.')
       err.status = 400
@@ -477,7 +477,7 @@ class AuthService {
     await user.save()
 
     // Remove TOTP data
-    await UserTotp.deleteOne({ userId })
+    await RegistrationTotp.deleteOne({ userId })
   }
 
   /**
@@ -487,7 +487,7 @@ class AuthService {
    * @returns {Promise<boolean>} Результат проверки
    */
   async verify2FAToken(userId, token) {
-    const totpRecord = await UserTotp.findOne({
+    const totpRecord = await RegistrationTotp.findOne({
       userId,
       isEnabled: true,
     })
@@ -550,7 +550,7 @@ class AuthService {
       throw err
     }
 
-    const totpRecord = await UserTotp.findOne({ userId })
+    const totpRecord = await RegistrationTotp.findOne({ userId })
 
     let backupCodesCount = 0
     if (totpRecord?.backupCodes) {

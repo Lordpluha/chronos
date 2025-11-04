@@ -8,9 +8,9 @@ import { Provider } from './Provider'
 const root = document.getElementById('root')
 
 createRoot(root).render(
-	<StrictMode>
-		<Provider>
-			<RouterProvider router={router} />
-		</Provider>
-	</StrictMode>,
+  <StrictMode>
+    <Provider>
+      <RouterProvider router={router} />
+    </Provider>
+  </StrictMode>,
 )
