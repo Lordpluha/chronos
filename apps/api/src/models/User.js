@@ -10,6 +10,24 @@ const userSchema = new mongoose.Schema(
       trim: true,
       minlength: 3,
       maxlength: 30,
+      validate: {
+        validator: (value) => /^[a-zA-Z0-9_-]+$/.test(value),
+        message: 'Login can only contain alphanumeric characters, underscores, and hyphens',
+      },
+    },
+    email: {
+      type: String,
+      required: function () {
+        return !this.google_id
+      },
+      unique: true,
+      sparse: true,
+      trim: true,
+      lowercase: true,
+      validate: {
+        validator: (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        message: 'Invalid email format',
+      },
     },
     full_name: {
       type: String,
@@ -43,6 +61,10 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       default: null,
+      validate: {
+        validator: (value) => !value || /^https?:\/\/.+/.test(value),
+        message: 'Avatar must be a valid URL',
+      },
     },
     calendars: [
       {
@@ -89,6 +111,39 @@ userSchema.methods.checkPassword = async function (candidatePassword) {
 // Static method to find by login
 userSchema.statics.findByLogin = function (login) {
   return this.findOne({ login: login })
+}
+
+// Static method to find by email
+userSchema.statics.findByEmail = function (email) {
+  return this.findOne({ email: email.toLowerCase() })
+}
+
+// Instance method to add calendar
+userSchema.methods.addCalendar = function (calendarId) {
+  if (!this.calendars.includes(calendarId)) {
+    this.calendars.push(calendarId)
+  }
+}
+
+// Instance method to remove calendar
+userSchema.methods.removeCalendar = function (calendarId) {
+  this.calendars = this.calendars.filter(
+    (calendar) => calendar.toString() !== calendarId.toString(),
+  )
+}
+
+// Instance method to add task list
+userSchema.methods.addTaskList = function (taskListId) {
+  if (!this.task_lists.includes(taskListId)) {
+    this.task_lists.push(taskListId)
+  }
+}
+
+// Instance method to remove task list
+userSchema.methods.removeTaskList = function (taskListId) {
+  this.task_lists = this.task_lists.filter(
+    (list) => list.toString() !== taskListId.toString(),
+  )
 }
 
 export const User = mongoose.model('User', userSchema)

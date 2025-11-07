@@ -48,6 +48,26 @@ const taskSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    priority: {
+      type: String,
+      enum: ['low', 'medium', 'high', 'urgent'],
+      default: 'medium',
+    },
+    tags: [
+      {
+        type: String,
+        trim: true,
+        maxlength: 50,
+      },
+    ],
+    estimated_duration: {
+      type: Number, // in minutes
+      min: 0,
+    },
+    actual_duration: {
+      type: Number, // in minutes
+      min: 0,
+    },
     start: {
       type: Date,
       default: null,
@@ -90,6 +110,12 @@ taskSchema.index({ start: 1 })
 taskSchema.index({ end: 1 })
 taskSchema.index({ title: 'text', description: 'text' })
 taskSchema.index({ completed: 1, start: 1, end: 1 })
+taskSchema.index({ priority: 1 })
+taskSchema.index({ tags: 1 })
+taskSchema.index({ completed: 1, priority: 1 })
+taskSchema.index({ completed: 1, end: 1 })
+taskSchema.index({ priority: 1, end: 1 })
+taskSchema.index({ completed: 1, priority: 1, end: 1 })
 
 // Virtual for task ID (alias for _id)
 taskSchema.virtual('id').get(function () {
@@ -196,6 +222,48 @@ taskSchema.statics.findUpcoming = function (days = 7) {
     end: { $gte: now, $lte: future },
   }).sort({ end: 1 })
 }
+
+// Static method to find tasks by priority
+taskSchema.statics.findByPriority = function (priority) {
+  return this.find({ priority, completed: false }).sort({ end: 1 })
+}
+
+// Static method to find tasks by tags
+taskSchema.statics.findByTags = function (tags) {
+  return this.find({ tags: { $in: tags } }).sort({ priority: -1, end: 1 })
+}
+
+// Static method to find high priority overdue tasks
+taskSchema.statics.findHighPriorityOverdue = function () {
+  return this.find({
+    completed: false,
+    priority: { $in: ['high', 'urgent'] },
+    end: { $lt: new Date() },
+  }).sort({ priority: -1, end: 1 })
+}
+
+// Instance method to add tag
+taskSchema.methods.addTag = function (tag) {
+  if (!this.tags.includes(tag)) {
+    this.tags.push(tag)
+  }
+}
+
+// Instance method to remove tag
+taskSchema.methods.removeTag = function (tag) {
+  this.tags = this.tags.filter((t) => t !== tag)
+}
+
+// Instance method to update duration tracking
+taskSchema.methods.updateActualDuration = function (minutes) {
+  this.actual_duration = minutes
+}
+
+// Virtual to get priority level as number (for sorting)
+taskSchema.virtual('priorityLevel').get(function () {
+  const levels = { low: 1, medium: 2, high: 3, urgent: 4 }
+  return levels[this.priority] || 2
+})
 
 // Instance method to mark as completed
 taskSchema.methods.markCompleted = function () {

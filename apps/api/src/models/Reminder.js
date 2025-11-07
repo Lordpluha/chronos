@@ -60,6 +60,9 @@ reminderSchema.index({ creator: 1 })
 reminderSchema.index({ organizer: 1 })
 reminderSchema.index({ start: 1 })
 reminderSchema.index({ title: 'text', description: 'text' })
+reminderSchema.index({ calendar: 1, start: 1 })
+reminderSchema.index({ creator: 1, start: 1 })
+reminderSchema.index({ organizer: 1, start: 1 })
 
 // Virtual for reminder ID (alias for _id)
 reminderSchema.virtual('id').get(function () {

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { locationSchema } from './Location.js'
 
 const eventSchema = new mongoose.Schema(
   {
@@ -49,6 +50,75 @@ const eventSchema = new mongoose.Schema(
         message: 'End date must be after start date',
       },
     },
+    location: {
+      type: {
+        name: {
+          type: String,
+          trim: true,
+          maxlength: 500,
+        },
+        address: {
+          type: String,
+          trim: true,
+          maxlength: 500,
+        },
+        coordinates: {
+          longitude: {
+            type: Number,
+            min: -180,
+            max: 180,
+          },
+          latitude: {
+            type: Number,
+            min: -90,
+            max: 90,
+          },
+        },
+        url: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+          validate: {
+            validator: (value) => !value || /^https?:\/\/.+/.test(value),
+            message: 'Invalid URL format',
+          },
+        },
+      },
+      default: null,
+    },
+    is_all_day: {
+      type: Boolean,
+      default: false,
+    },
+    status: {
+      type: String,
+      enum: ['confirmed', 'tentative', 'cancelled'],
+      default: 'confirmed',
+    },
+    attendees: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        email: {
+          type: String,
+          trim: true,
+        },
+        status: {
+          type: String,
+          enum: ['invited', 'accepted', 'declined', 'maybe'],
+          default: 'invited',
+        },
+        invited_at: {
+          type: Date,
+          default: Date.now,
+        },
+        responded_at: {
+          type: Date,
+        },
+      },
+    ],
   },
   {
     timestamps: {
@@ -70,6 +140,12 @@ eventSchema.index({ creator: 1 })
 eventSchema.index({ organizer: 1 })
 eventSchema.index({ start: 1, end: 1 })
 eventSchema.index({ title: 'text', description: 'text' })
+eventSchema.index({ status: 1 })
+eventSchema.index({ 'attendees.user': 1 })
+eventSchema.index({ calendar: 1, start: 1 })
+eventSchema.index({ calendar: 1, status: 1 })
+eventSchema.index({ organizer: 1, start: 1 })
+eventSchema.index({ is_all_day: 1, start: 1 })
 
 // Virtual for event ID (alias for _id)
 eventSchema.virtual('id').get(function () {
@@ -152,6 +228,60 @@ eventSchema.methods.isUpcoming = function () {
 // Instance method to check if event has passed
 eventSchema.methods.isPast = function () {
   return this.end < new Date()
+}
+
+// Instance method to add attendee
+eventSchema.methods.addAttendee = function (userIdOrEmail, isUser = true) {
+  const existingIndex = this.attendees.findIndex((attendee) => {
+    if (isUser && attendee.user) {
+      return attendee.user.toString() === userIdOrEmail.toString()
+    }
+    return attendee.email === userIdOrEmail
+  })
+
+  if (existingIndex === -1) {
+    const attendeeData = isUser
+      ? { user: userIdOrEmail, status: 'invited' }
+      : { email: userIdOrEmail, status: 'invited' }
+
+    this.attendees.push(attendeeData)
+  }
+}
+
+// Instance method to update attendee status
+eventSchema.methods.updateAttendeeStatus = function (userIdOrEmail, status, isUser = true) {
+  const attendeeIndex = this.attendees.findIndex((attendee) => {
+    if (isUser && attendee.user) {
+      return attendee.user.toString() === userIdOrEmail.toString()
+    }
+    return attendee.email === userIdOrEmail
+  })
+
+  if (attendeeIndex >= 0) {
+    this.attendees[attendeeIndex].status = status
+    this.attendees[attendeeIndex].responded_at = new Date()
+  }
+}
+
+// Instance method to remove attendee
+eventSchema.methods.removeAttendee = function (userIdOrEmail, isUser = true) {
+  this.attendees = this.attendees.filter((attendee) => {
+    if (isUser && attendee.user) {
+      return attendee.user.toString() !== userIdOrEmail.toString()
+    }
+    return attendee.email !== userIdOrEmail
+  })
+}
+
+// Static method to find events by attendee
+eventSchema.statics.findByAttendee = function (userId) {
+  return this.find({
+    $or: [
+      { creator: userId },
+      { organizer: userId },
+      { 'attendees.user': userId },
+    ],
+  }).populate('creator organizer calendar attendees.user')
 }
 
 export const Event = mongoose.model('Event', eventSchema)
