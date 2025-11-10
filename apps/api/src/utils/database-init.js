@@ -22,7 +22,19 @@ export async function initializeDatabase() {
     await PasswordResetOtp.ensureIndexes()
     await RegistrationTotp.ensureIndexes()
     await Reminder.ensureIndexes()
-    await Session.ensureIndexes()
+
+    // Handle Session indexes separately to catch index conflicts
+    try {
+      await Session.ensureIndexes()
+    } catch (sessionError) {
+      // Code 85 = IndexOptionsConflict, Code 86 = IndexKeySpecsConflict
+      // Ignore these errors - indexes already exist
+      if (sessionError.code !== 85 && sessionError.code !== 86) {
+        throw sessionError
+      }
+      console.log('ℹ️  Session indexes already exist (skipping)')
+    }
+
     await Task.ensureIndexes()
     await TaskList.ensureIndexes()
     await User.ensureIndexes()

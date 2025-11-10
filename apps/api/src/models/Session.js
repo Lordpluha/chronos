@@ -49,8 +49,7 @@ const sessionSchema = new mongoose.Schema(
     refresh_token: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
+      index: { unique: true, sparse: true },
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,

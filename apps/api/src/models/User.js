@@ -72,6 +72,14 @@ const userSchema = new mongoose.Schema(
         ref: 'Calendar',
       },
     ],
+    twoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: {
@@ -116,6 +124,16 @@ userSchema.statics.findByLogin = function (login) {
 // Static method to find by email
 userSchema.statics.findByEmail = function (email) {
   return this.findOne({ email: email.toLowerCase() })
+}
+
+// Static method to find by email or login
+userSchema.statics.findByEmailOrUsername = function (loginOrEmail) {
+  return this.findOne({
+    $or: [
+      { login: loginOrEmail },
+      { email: loginOrEmail.toLowerCase() }
+    ]
+  })
 }
 
 // Instance method to add calendar

@@ -42,6 +42,7 @@ export const registerSchema = z.object({
   login: loginFieldSchema,
   email: emailSchema,
   password: passwordSchema,
+	full_name: z.string().min(1, 'Full name is required').max(100, 'Full name must be less than 100 characters').trim(),
 })
 
 export const loginSchema = z.object({

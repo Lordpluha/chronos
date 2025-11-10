@@ -4,5 +4,5 @@ import { UsersRouter } from './Users/Users.controller.js'
 
 export const router = Router()
 
-router.use('/auth', AuthRouter)
-router.use('/users', UsersRouter)
+router.use('/', AuthRouter)
+router.use('/', UsersRouter)
