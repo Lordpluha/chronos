@@ -250,13 +250,11 @@ router.get('/auth/me', requireAccessToken, async (req, res) => {
       email: user.email,
       full_name: user.full_name,
       avatar: user.avatar,
-      description: user.description,
-      rating: user.rating,
-      role: user.role,
-      created_at: user.created_at,
+      created: user.created,
       google_id: user.google_id,
-      email_verified: user.email_verified,
-      is_2fa_enabled: user.is_2fa_enabled,
+      is_email_verified: user.is_email_verified,
+      twoFactorEnabled: user.twoFactorEnabled,
+      lastLoginAt: user.lastLoginAt,
     }
 
     return res.json(userInfo)

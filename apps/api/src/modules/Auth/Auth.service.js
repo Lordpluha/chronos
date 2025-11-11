@@ -3,13 +3,12 @@ import speakeasy from 'speakeasy'
 import { AppConfig } from '../../config/index.js'
 import { User } from '../../models/User.js'
 import { Session } from '../../models/Session.js'
-import { PasswordReset } from '../../models/PasswordReset.js'
-import { UserTotp } from '../../models/UserTotp.js'
+import { PasswordResetOtp } from '../../models/PasswordResetOtp.js'
+import { RegistrationTotp } from '../../models/RegistrationTotp.js'
 import {
   INVALID_OR_EXPIRED_CODE,
   INVALID_USERNAME_OR_PASSWORD,
   REFRESH_TOKEN_MISSING,
-  USER_REGISTERED,
 } from '../../messages/index.js'
 import {
   DateTimeUtils,
@@ -20,24 +19,24 @@ import {
 import { googleAuthService } from './Auth.google.service.js'
 
 class AuthService {
-  async register({ login, password, email }) {
+  async register({ login, password, email, full_name }) {
     // Check if user already exists
     const existingUser = await User.findOne({
-      $or: [{ username: login }, { email: email }],
+      $or: [{ login: login }, { email: email }],
     })
 
     if (existingUser) {
-      const err = new Error(USER_REGISTERED)
+      const err = new Error('User already exists')
       err.status = 409
       throw err
     }
 
     // Create new user
     const user = new User({
-      username: login,
+      login: login,
       email: email,
-      password: password, // Will be hashed by the pre-save hook
-      fullName: login,
+      password_hash: password, // Will be hashed by the pre-save hook
+      full_name: full_name
     })
 
     await user.save()
@@ -84,14 +83,14 @@ class AuthService {
     await user.save()
 
     // Generate tokens
-    const access_token = JWTUtils.generateAccessToken(user._id, user.username)
-    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.username)
+    const access_token = JWTUtils.generateAccessToken(user._id, user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
     // Create session
     const session = new Session({
-      userId: user._id,
-      accessToken: access_token,
-      refreshToken: refresh_token,
+      user: user._id,
+      access_token: access_token,
+      refresh_token: refresh_token,
     })
 
     await session.save()
@@ -100,9 +99,8 @@ class AuthService {
   }
 
   async logout(access_token) {
-    // Decode userId and delete all sessions for the user
-    const { userId } = JWTUtils.verifyToken(access_token)
-    await Session.deleteMany({ userId })
+    // Delete only the current session by access token
+    await Session.deleteOne({ access_token: access_token })
   }
 
   async refresh(old_refresh_token) {
@@ -113,20 +111,15 @@ class AuthService {
     }
 
     // Find session with the refresh token
-    const session = await Session.findOne({ refreshToken: old_refresh_token })
+    const session = await Session.findOne({ refresh_token: old_refresh_token })
     if (!session) {
       const err = new Error('Invalid refresh token')
       err.status = 401
       throw err
     }
 
-    // Check if session is expired
-    if (session.expiresAt < new Date()) {
-      await Session.deleteOne({ _id: session._id })
-      const err = new Error('Refresh token expired')
-      err.status = 401
-      throw err
-    }
+    // Check if session is expired (TTL is 30 days, managed by MongoDB)
+    // The Session model has automatic expiration via TTL index
 
     // Verify token
     const { userId, login } = JWTUtils.verifyToken(old_refresh_token)
@@ -135,11 +128,15 @@ class AuthService {
     const access_token = JWTUtils.generateAccessToken(userId, login)
     const refresh_token = JWTUtils.generateRefreshToken(userId, login)
 
-    // Update session with new tokens
-    session.accessToken = access_token
-    session.refreshToken = refresh_token
-    session.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    await session.save()
+    // Delete old session and create new one to avoid duplicate key errors
+    await Session.deleteOne({ _id: session._id })
+
+    const newSession = new Session({
+      user: userId,
+      access_token: access_token,
+      refresh_token: refresh_token,
+    })
+    await newSession.save()
 
     return {
       access: access_token,
@@ -154,6 +151,14 @@ class AuthService {
    * @param {string} body.email
    */
   async sendCode(_access_token, body) {
+    // Find user by email
+    const user = await User.findOne({ email: body.email })
+    if (!user) {
+      const err = new Error('User with this email not found')
+      err.status = 404
+      throw err
+    }
+
     const code = generateCode()
     console.log(code)
 
@@ -174,10 +179,10 @@ class AuthService {
     )
 
     // Create password reset record
-    const passwordReset = new PasswordReset({
-      email: body.email,
+    const passwordReset = new PasswordResetOtp({
+      user: user._id,
       code: code,
-      expiresAt: expiresAt,
+      expires_at: expiresAt,
     })
 
     await passwordReset.save()
@@ -191,11 +196,10 @@ class AuthService {
    */
   async resetPassword(code, { password }) {
     // Find valid password reset record
-    const resetRecord = await PasswordReset.findOne({
+    const resetRecord = await PasswordResetOtp.findOne({
       code: code,
-      used: false,
-      expiresAt: { $gt: new Date() },
-    })
+      expires_at: { $gt: new Date() },
+    }).populate('user')
 
     if (!resetRecord) {
       const err = new Error(INVALID_OR_EXPIRED_CODE)
@@ -203,8 +207,7 @@ class AuthService {
       throw err
     }
 
-    // Find user by email
-    const user = await User.findOne({ email: resetRecord.email })
+    const user = resetRecord.user
     if (!user) {
       const err = new Error('User not found')
       err.status = 404
@@ -212,12 +215,11 @@ class AuthService {
     }
 
     // Update password (will be hashed by pre-save hook)
-    user.password = password
+    user.password_hash = password
     await user.save()
 
-    // Mark reset code as used
-    resetRecord.used = true
-    await resetRecord.save()
+    // Delete the used reset code
+    await PasswordResetOtp.deleteOne({ _id: resetRecord._id })
   }
 
   /**
@@ -230,7 +232,7 @@ class AuthService {
       googleUser
 
     // Find user by Google ID first
-    let user = await User.findOne({ googleId: googleId })
+    let user = await User.findOne({ google_id: googleId })
 
     if (!user) {
       // If no user with Google ID, find by email
@@ -238,7 +240,7 @@ class AuthService {
 
       if (user) {
         // Link Google ID to existing user
-        user.googleId = googleId
+        user.google_id = googleId
         if (picture) user.avatar = picture
         await user.save()
       } else {
@@ -248,7 +250,7 @@ class AuthService {
         let counter = 1
 
         // Ensure username uniqueness
-        while (await User.findOne({ username: uniqueUsername })) {
+        while (await User.findOne({ login: uniqueUsername })) {
           uniqueUsername = `${username}${counter}`
           counter++
         }
@@ -257,12 +259,12 @@ class AuthService {
           name || `${given_name || ''} ${family_name || ''}`.trim()
 
         user = new User({
-          username: uniqueUsername,
+          login: uniqueUsername,
           email: email,
-          googleId: googleId,
-          fullName: fullName || uniqueUsername,
+          google_id: googleId,
+          full_name: fullName || uniqueUsername,
           avatar: picture,
-          isEmailVerified: true,
+          is_email_verified: true,
         })
 
         await user.save()
@@ -274,14 +276,14 @@ class AuthService {
     await user.save()
 
     // Generate tokens
-    const access_token = JWTUtils.generateAccessToken(user._id, user.username)
-    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.username)
+    const access_token = JWTUtils.generateAccessToken(user._id, user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
     // Create session
     const session = new Session({
-      userId: user._id,
-      accessToken: access_token,
-      refreshToken: refresh_token,
+      user: user._id,
+      access_token: access_token,
+      refresh_token: refresh_token,
     })
 
     await session.save()
@@ -371,7 +373,7 @@ class AuthService {
     })
 
     // Save or update TOTP record (but don't enable yet)
-    await UserTotp.findOneAndUpdate(
+    await RegistrationTotp.findOneAndUpdate(
       { userId },
       {
         secretKey: secret.base32,
@@ -414,7 +416,7 @@ class AuthService {
     }
 
     // Get TOTP record
-    const totpRecord = await UserTotp.findOne({ userId })
+    const totpRecord = await RegistrationTotp.findOne({ userId })
     if (!totpRecord) {
       const err = new Error('2FA not set up. Please run setup first.')
       err.status = 400
@@ -477,7 +479,7 @@ class AuthService {
     await user.save()
 
     // Remove TOTP data
-    await UserTotp.deleteOne({ userId })
+    await RegistrationTotp.deleteOne({ userId })
   }
 
   /**
@@ -487,7 +489,7 @@ class AuthService {
    * @returns {Promise<boolean>} Результат проверки
    */
   async verify2FAToken(userId, token) {
-    const totpRecord = await UserTotp.findOne({
+    const totpRecord = await RegistrationTotp.findOne({
       userId,
       isEnabled: true,
     })
@@ -550,7 +552,7 @@ class AuthService {
       throw err
     }
 
-    const totpRecord = await UserTotp.findOne({ userId })
+    const totpRecord = await RegistrationTotp.findOne({ userId })
 
     let backupCodesCount = 0
     if (totpRecord?.backupCodes) {
