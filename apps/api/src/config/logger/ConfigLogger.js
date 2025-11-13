@@ -1,5 +1,8 @@
 /**
  * Маскирует чувствительную информацию для логирования
+ * @param {string} value - Значение для маскировки
+ * @param {number} visibleChars - Количество видимых символов в начале
+ * @returns {string} Замаскированное значение
  */
 export function maskSensitiveInfo(value, visibleChars = 4) {
   if (!value || value.length <= visibleChars) {
@@ -12,6 +15,7 @@ export function maskSensitiveInfo(value, visibleChars = 4) {
 
 /**
  * Создает разделительную линию для таблицы
+ * @return {string} Разделительная линия
  */
 function createTableBorder() {
   return '┌─────────────────────────────────────────────────────────────┐'
@@ -19,6 +23,7 @@ function createTableBorder() {
 
 /**
  * Создает нижнюю границу таблицы
+ * @return {string} Нижняя граница таблицы
  */
 function createTableBottom() {
   return '└─────────────────────────────────────────────────────────────┘'
@@ -26,6 +31,10 @@ function createTableBottom() {
 
 /**
  * Форматирует строку для таблицы
+ * @param {string} label - Метка
+ * @param {string} value - Значение
+ * @param {number} maxLength - Максимальная длина строки
+ * @returns {string} Отформатированная строка
  */
 function formatTableRow(label, value, maxLength = 59) {
   const content = `${label}: ${value}`
@@ -34,6 +43,8 @@ function formatTableRow(label, value, maxLength = 59) {
 
 /**
  * Логирует успешную валидацию категории
+ * @param {string} category - Название категории
+ * @return {void}
  */
 export function logValidationSuccess(category) {
   console.log(
@@ -43,6 +54,8 @@ export function logValidationSuccess(category) {
 
 /**
  * Логирует ошибки валидации
+ * @param {Array<string>} errors - Список ошибок
+ * @return {void}
  */
 export function logValidationErrors(errors) {
   console.error('\n❌ Configuration validation failed:')
@@ -58,6 +71,9 @@ export function logValidationErrors(errors) {
 
 /**
  * Логирует текущую конфигурацию
+ * @param {import("..").Configuration} config - Конфигурационный объект
+ * @param {import("..").Environment} env - Текущая среда выполнения
+ * @return {void}
  */
 export function logConfiguration(config, env) {
   console.log('\n🔧 Application Configuration:')

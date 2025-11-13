@@ -18,20 +18,24 @@ const reminderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     organizer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     calendar: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Calendar',
       required: true,
+      index: true,
     },
     start: {
       type: Date,
       required: true,
+      index: true,
     },
     time_zone: {
       type: String,
@@ -51,18 +55,102 @@ const reminderSchema = new mongoose.Schema(
     toObject: {
       virtuals: true,
     },
+    indexes: [
+      [{ title: 'text', description: 'text' }],
+      [{ calendar: 1, start: 1 }],
+      [{ creator: 1, start: 1 }],
+      [{ organizer: 1, start: 1 }],
+    ],
+    statics: {
+      findByCalendar(calendarId, options = {}) {
+        const query = this.find({ calendar: calendarId })
+
+        if (options.startDate || options.endDate) {
+          const dateFilter = {}
+          if (options.startDate) dateFilter.$gte = options.startDate
+          if (options.endDate) dateFilter.$lte = options.endDate
+          query.where('start', dateFilter)
+        }
+
+        return query.populate('creator organizer calendar')
+      },
+      findByCreator(creatorId) {
+        return this.find({ creator: creatorId }).populate(
+          'creator organizer calendar',
+        )
+      },
+      findByOrganizer(organizerId) {
+        return this.find({ organizer: organizerId }).populate(
+          'creator organizer calendar',
+        )
+      },
+      findOverdue(options = {}) {
+        const query = this.find({ start: { $lt: new Date() } })
+
+        if (options.calendarId) {
+          query.where('calendar', options.calendarId)
+        }
+
+        if (options.userId) {
+          query.where({
+            $or: [{ creator: options.userId }, { organizer: options.userId }],
+          })
+        }
+
+        return query.populate('creator organizer calendar')
+      },
+      findUpcoming(hours = 24, options = {}) {
+        const now = new Date()
+        const future = new Date(now.getTime() + hours * 60 * 60 * 1000)
+
+        const query = this.find({
+          start: { $gte: now, $lte: future },
+        })
+
+        if (options.calendarId) {
+          query.where('calendar', options.calendarId)
+        }
+
+        if (options.userId) {
+          query.where({
+            $or: [{ creator: options.userId }, { organizer: options.userId }],
+          })
+        }
+
+        return query.populate('creator organizer calendar').sort({ start: 1 })
+      },
+      findInDateRange(startDate, endDate, options = {}) {
+        const query = this.find({
+          start: { $gte: startDate, $lte: endDate },
+        })
+
+        if (options.calendarId) {
+          query.where('calendar', options.calendarId)
+        }
+
+        return query.populate('creator organizer calendar')
+      },
+    },
+    methods: {
+      hasAccess(userId) {
+        return (
+          this.creator.toString() === userId.toString() ||
+          this.organizer.toString() === userId.toString()
+        )
+      },
+      shouldTrigger(minutesBefore = 0) {
+        const now = new Date()
+        const triggerTime = new Date(this.start.getTime() - minutesBefore * 60 * 1000)
+        return now >= triggerTime && now <= this.start
+      },
+      getTimeUntil() {
+        const now = new Date()
+        const timeDiff = this.start - now
+        return timeDiff > 0 ? timeDiff : 0
+      },
+    },
   },
 )
-
-// Index for better performance
-reminderSchema.index({ calendar: 1 })
-reminderSchema.index({ creator: 1 })
-reminderSchema.index({ organizer: 1 })
-reminderSchema.index({ start: 1 })
-reminderSchema.index({ title: 'text', description: 'text' })
-reminderSchema.index({ calendar: 1, start: 1 })
-reminderSchema.index({ creator: 1, start: 1 })
-reminderSchema.index({ organizer: 1, start: 1 })
 
 // Virtual for reminder ID (alias for _id)
 reminderSchema.virtual('id').get(function () {
@@ -80,111 +168,5 @@ reminderSchema.virtual('isUpcoming').get(function () {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
   return this.start > now && this.start <= tomorrow
 })
-
-// Static method to find reminders by calendar
-reminderSchema.statics.findByCalendar = function (calendarId, options = {}) {
-  const query = this.find({ calendar: calendarId })
-
-  if (options.startDate || options.endDate) {
-    const dateFilter = {}
-    if (options.startDate) dateFilter.$gte = options.startDate
-    if (options.endDate) dateFilter.$lte = options.endDate
-    query.where('start', dateFilter)
-  }
-
-  return query.populate('creator organizer calendar')
-}
-
-// Static method to find reminders by creator
-reminderSchema.statics.findByCreator = function (creatorId) {
-  return this.find({ creator: creatorId }).populate(
-    'creator organizer calendar',
-  )
-}
-
-// Static method to find reminders by organizer
-reminderSchema.statics.findByOrganizer = function (organizerId) {
-  return this.find({ organizer: organizerId }).populate(
-    'creator organizer calendar',
-  )
-}
-
-// Static method to find overdue reminders
-reminderSchema.statics.findOverdue = function (options = {}) {
-  const query = this.find({ start: { $lt: new Date() } })
-
-  if (options.calendarId) {
-    query.where('calendar', options.calendarId)
-  }
-
-  if (options.userId) {
-    query.where({
-      $or: [{ creator: options.userId }, { organizer: options.userId }],
-    })
-  }
-
-  return query.populate('creator organizer calendar')
-}
-
-// Static method to find upcoming reminders
-reminderSchema.statics.findUpcoming = function (hours = 24, options = {}) {
-  const now = new Date()
-  const future = new Date(now.getTime() + hours * 60 * 60 * 1000)
-
-  const query = this.find({
-    start: { $gte: now, $lte: future },
-  })
-
-  if (options.calendarId) {
-    query.where('calendar', options.calendarId)
-  }
-
-  if (options.userId) {
-    query.where({
-      $or: [{ creator: options.userId }, { organizer: options.userId }],
-    })
-  }
-
-  return query.populate('creator organizer calendar').sort({ start: 1 })
-}
-
-// Static method to find reminders in date range
-reminderSchema.statics.findInDateRange = function (
-  startDate,
-  endDate,
-  options = {},
-) {
-  const query = this.find({
-    start: { $gte: startDate, $lte: endDate },
-  })
-
-  if (options.calendarId) {
-    query.where('calendar', options.calendarId)
-  }
-
-  return query.populate('creator organizer calendar')
-}
-
-// Instance method to check if user has access to reminder
-reminderSchema.methods.hasAccess = function (userId) {
-  return (
-    this.creator.toString() === userId.toString() ||
-    this.organizer.toString() === userId.toString()
-  )
-}
-
-// Instance method to check if reminder should be triggered
-reminderSchema.methods.shouldTrigger = function (minutesBefore = 0) {
-  const now = new Date()
-  const triggerTime = new Date(this.start.getTime() - minutesBefore * 60 * 1000)
-  return now >= triggerTime && now <= this.start
-}
-
-// Instance method to get time until reminder
-reminderSchema.methods.getTimeUntil = function () {
-  const now = new Date()
-  const timeDiff = this.start - now
-  return timeDiff > 0 ? timeDiff : 0
-}
 
 export const Reminder = mongoose.model('Reminder', reminderSchema)

@@ -17,8 +17,8 @@ export class ConfigValidator {
    * Форматирует ошибки валидации
    */
   formatValidationErrors(category, zodError) {
-    const errors = zodError.errors || zodError.issues || []
-    return errors.map((error) => {
+    const issues = zodError.issues || []
+    return issues.map((error) => {
       const path = error.path?.join('.') || 'unknown'
       return `[${category.toUpperCase()}] ${path}: ${error.message}`
     })
@@ -76,7 +76,7 @@ export class ConfigValidator {
       return schema.parse({ [name]: value })[name]
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessage = error.errors[0]?.message || 'Validation failed'
+        const errorMessage = error.issues[0]?.message || 'Validation failed'
         throw new Error(`Environment variable ${name}: ${errorMessage}`)
       }
       throw error

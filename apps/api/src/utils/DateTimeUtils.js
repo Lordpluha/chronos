@@ -1,4 +1,4 @@
-export class DateTimeUtils {
+export class DateTimeUtilsClass {
   /**
    * Конвертирует строку длительности в миллисекунды.
    * Поддерживаемые единицы (регистр не важен): d, h, m, s, ms.
@@ -17,7 +17,7 @@ export class DateTimeUtils {
       parseDurationToMs("1d4h")      // 104400000
     ```
   */
-  static parseDurationToMs(input) {
+  parseDurationToMs(input) {
     if (typeof input !== 'string') {
       throw new TypeError('Duration must be a string')
     }
@@ -56,3 +56,5 @@ export class DateTimeUtils {
     return Math.round(total)
   }
 }
+
+export const DateTimeUtils = new DateTimeUtilsClass()

@@ -1,8 +1,7 @@
 import argon2 from 'argon2'
-import crypto from 'node:crypto'
 
-export class PasswordUtils {
-  static async comparePasswords(password, hashedPassword) {
+export class PasswordUtilsClass {
+  async comparePasswords(password, hashedPassword) {
     try {
       // Проверяем пароль с помощью argon2id
       const isValid = await argon2.verify(hashedPassword, password)
@@ -25,7 +24,7 @@ export class PasswordUtils {
     }
   }
 
-  static async hashPassword(password) {
+  async hashPassword(password) {
     try {
       // Хешируем пароль с помощью argon2id
       const hash = await argon2.hash(password, {
@@ -45,7 +44,7 @@ export class PasswordUtils {
   }
 
   // Дополнительная функция для проверки, нужно ли обновить хеш
-  static needsRehash(hashedPassword) {
+  needsRehash(hashedPassword) {
     try {
       return argon2.needsRehash(hashedPassword, {
         type: argon2.argon2id,
@@ -59,7 +58,7 @@ export class PasswordUtils {
   }
 
   // Функция для проверки силы пароля
-  static validatePasswordStrength(password) {
+  validatePasswordStrength(password) {
     const minLength = 8
     const hasUppercase = /[A-Z]/.test(password)
     const hasLowercase = /[a-z]/.test(password)
@@ -94,3 +93,5 @@ export class PasswordUtils {
     }
   }
 }
+
+export const PasswordUtils = new PasswordUtilsClass()
