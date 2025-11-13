@@ -1,6 +1,7 @@
 import { Landing } from '@pages/Landing'
 import { Login } from '@pages/Login'
 import { Registration } from '@pages/Registration'
+import { CalendarPage } from '@pages/Calendar'
 import { ROUTES } from '@shared/routes'
 import { createBrowserRouter } from 'react-router'
 
@@ -16,5 +17,9 @@ export const router = createBrowserRouter([
   {
     path: ROUTES.registration,
     element: <Registration />,
+  },
+  {
+    path: '/calendar',
+    element: <CalendarPage />,
   },
 ])
