@@ -1,6 +1,5 @@
 import { AppConfig } from '../config/index.js'
 import { Session } from '../models/Session.js'
-import { User } from '../models/User.js'
 import { JWTUtils } from '../utils/index.js'
 
 export const requireAccessToken = async (req, res, next) => {
@@ -38,36 +37,6 @@ export const requireRefreshToken = async (req, res, next) => {
     next()
   } catch (err) {
     return res.status(err.status || 401).json({ message: err.message })
-  }
-}
-
-export const requireAdmin = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.userId)
-
-    if (!user || user.role !== 'admin') {
-      throw { status: 403, message: 'Admin privileges required' }
-    }
-
-    next()
-  } catch (err) {
-    return res.status(err.status || 403).json({ message: err.message })
-  }
-}
-
-// Проверка роли модератора или администратора
-export const requireModerator = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.userId)
-
-    if (!user || (user.role !== 'moderator' && user.role !== 'admin')) {
-      throw { status: 403, message: 'Moderator or admin privileges required' }
-    }
-
-    req.userRole = user.role
-    next()
-  } catch (err) {
-    return res.status(err.status || 403).json({ message: err.message })
   }
 }
 

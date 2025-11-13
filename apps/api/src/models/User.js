@@ -92,10 +92,59 @@ const userSchema = new mongoose.Schema(
         return ret
       },
     },
+    statics: {
+      findByLogin(login) {
+        return this.findOne({ login: login })
+      },
+      findByEmail(email) {
+        return this.findOne({ email: email.toLowerCase() })
+      },
+      findByEmailOrUsername(loginOrEmail) {
+        return this.findOne({
+          $or: [
+            { login: loginOrEmail },
+            { email: loginOrEmail.toLowerCase() }
+          ]
+        })
+      },
+    },
+    methods: {
+      async checkPassword(candidatePassword) {
+        try {
+          return await argon2.verify(this.password_hash, candidatePassword)
+        } catch {
+          return false
+        }
+      },
+      addCalendar(calendarId) {
+        if (!this.calendars.includes(calendarId)) {
+          this.calendars.push(calendarId)
+        }
+      },
+      removeCalendar(calendarId) {
+        this.calendars = this.calendars.filter(
+          (calendar) => calendar.toString() !== calendarId.toString(),
+        )
+      },
+      addTaskList(taskListId) {
+        if (!this.task_lists.includes(taskListId)) {
+          this.task_lists.push(taskListId)
+        }
+      },
+      removeTaskList(taskListId) {
+        this.task_lists = this.task_lists.filter(
+          (list) => list.toString() !== taskListId.toString(),
+        )
+      },
+    },
   },
 )
 
-// Hash password before saving
+/**
+ * Hash password before saving
+ * @param {Function} next - Next middleware function
+ * @returns {Promise<void>}
+ */
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password_hash')) return next()
 
@@ -106,62 +155,5 @@ userSchema.pre('save', async function (next) {
     next(error)
   }
 })
-
-// Instance method to check password
-userSchema.methods.checkPassword = async function (candidatePassword) {
-  try {
-    return await argon2.verify(this.password_hash, candidatePassword)
-  } catch {
-    return false
-  }
-}
-
-// Static method to find by login
-userSchema.statics.findByLogin = function (login) {
-  return this.findOne({ login: login })
-}
-
-// Static method to find by email
-userSchema.statics.findByEmail = function (email) {
-  return this.findOne({ email: email.toLowerCase() })
-}
-
-// Static method to find by email or login
-userSchema.statics.findByEmailOrUsername = function (loginOrEmail) {
-  return this.findOne({
-    $or: [
-      { login: loginOrEmail },
-      { email: loginOrEmail.toLowerCase() }
-    ]
-  })
-}
-
-// Instance method to add calendar
-userSchema.methods.addCalendar = function (calendarId) {
-  if (!this.calendars.includes(calendarId)) {
-    this.calendars.push(calendarId)
-  }
-}
-
-// Instance method to remove calendar
-userSchema.methods.removeCalendar = function (calendarId) {
-  this.calendars = this.calendars.filter(
-    (calendar) => calendar.toString() !== calendarId.toString(),
-  )
-}
-
-// Instance method to add task list
-userSchema.methods.addTaskList = function (taskListId) {
-  if (!this.task_lists.includes(taskListId)) {
-    this.task_lists.push(taskListId)
-  }
-}
-
-// Instance method to remove task list
-userSchema.methods.removeTaskList = function (taskListId) {
-  this.task_lists = this.task_lists.filter(
-    (list) => list.toString() !== taskListId.toString(),
-  )
-}
 
 export const User = mongoose.model('User', userSchema)

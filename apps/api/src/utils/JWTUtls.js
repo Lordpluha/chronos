@@ -1,17 +1,18 @@
 import jwt from 'jsonwebtoken'
 import { AppConfig } from '../config/index.js'
 
-export class JWTUtils {
-  static generateAccessToken = (userId, username) =>
+export class JWTUtilsClass {
+  generateAccessToken = (userId, username) =>
     jwt.sign({ userId, username }, AppConfig.JWT_SECRET, {
       expiresIn: AppConfig.ACCESS_TOKEN_LIFETIME,
     })
-  static generateRefreshToken = (userId, username) =>
+		
+  generateRefreshToken = (userId, username) =>
     jwt.sign({ userId, username }, AppConfig.JWT_SECRET, {
       expiresIn: AppConfig.REFRESH_TOKEN_LIFETIME,
     })
 
-  static verifyToken = (token) => {
+  verifyToken = (token) => {
     let payload
     try {
       payload = jwt.verify(token, AppConfig.JWT_SECRET)
@@ -23,7 +24,7 @@ export class JWTUtils {
     return payload
   }
 
-  static generateHttpOnlyCookie = (res, access, refresh) => {
+  generateHttpOnlyCookie = (res, access, refresh) => {
     return res
       .cookie(AppConfig.ACCESS_TOKEN_NAME, access, {
         ...AppConfig.getCookieOptions('access'),
@@ -33,7 +34,7 @@ export class JWTUtils {
       })
   }
 
-  static clearHttpOnlyCookie = (res) => {
+  clearHttpOnlyCookie = (res) => {
     return res
       .clearCookie(
         AppConfig.ACCESS_TOKEN_NAME,
@@ -45,3 +46,5 @@ export class JWTUtils {
       )
   }
 }
+
+export const JWTUtils = new JWTUtilsClass()

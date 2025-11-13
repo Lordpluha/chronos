@@ -11,6 +11,7 @@ import {
   requireRefreshToken,
 } from '../../middleware/index.js'
 import { JWTUtils, validateBody, validateParams } from '../../utils/index.js'
+import { UsedOAuthCode } from '../../models/UsedOAuthCode.js'
 
 import { authService } from './Auth.service.js'
 import {
@@ -144,9 +145,6 @@ router.get('/auth/google', async (req, res) => {
   }
 })
 
-// Хранилище использованных кодов (в продакшене используйте Redis или БД)
-const usedCodes = new Set()
-
 router.get('/auth/google/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query
@@ -175,24 +173,16 @@ router.get('/auth/google/callback', async (req, res) => {
     }
 
     // Проверяем, не был ли код уже использован
-    if (usedCodes.has(code)) {
+    const isUsed = await UsedOAuthCode.isCodeUsed(code)
+    if (isUsed) {
       console.log('❌ Authorization code has already been used')
       return res
         .status(400)
         .json({ message: 'Authorization code has already been used' })
     }
 
-    // Добавляем код в список использованных
-    usedCodes.add(code)
-
-    // Очищаем старые коды (оставляем только последние 100)
-    if (usedCodes.size > 100) {
-      const codes = Array.from(usedCodes)
-      usedCodes.clear()
-      codes.slice(-50).forEach((c) => {
-        usedCodes.add(c)
-      })
-    }
+    // Добавляем код в список использованных (истекает через 10 минут)
+    await UsedOAuthCode.markAsUsed(code, 10)
 
     console.log('🔄 Processing Google OAuth callback...')
 
@@ -219,7 +209,7 @@ router.get('/auth/google/callback', async (req, res) => {
 
     // Удаляем код из использованных, если произошла ошибка
     if (req.query.code) {
-      usedCodes.delete(req.query.code)
+      await UsedOAuthCode.deleteOne({ code: req.query.code })
     }
 
     const frontendUrl =

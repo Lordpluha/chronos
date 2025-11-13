@@ -12,9 +12,17 @@ app.disable('x-powered-by')
 
 app.use(express.static('public'))
 
-// CORS
-app.use(cors())
+// Middleware
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || origin.startsWith(`http://${AppConfig.FRONT_HOST}:${AppConfig.FRONT_PORT}`) || origin.startsWith(`http://${AppConfig.HOST}:${AppConfig.PORT}`))
+      return cb(null, true)
+    return cb(new Error('Not allowed by CORS'))
+  },
+  credentials: true
+}))
 
+// @ts-expect-error
 app.use(cookieParser(AppConfig.JWT_SECRET))
 
 // Парсеры тела

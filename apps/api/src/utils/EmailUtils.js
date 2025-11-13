@@ -1,7 +1,7 @@
 import { AppConfig } from '../config/index.js'
 
-export class EmailUtils {
-  static async sendEmail(props) {
+export class EmailUtilsClass {
+  async sendEmail(props) {
     await AppConfig.emailTransporter
       .sendMail({
         from: AppConfig.emailFrom,
@@ -12,7 +12,7 @@ export class EmailUtils {
       })
   }
 
-  static generateEmail(code) {
+  generateEmail(code) {
     return `
       <div style="font-family:Arial,sans-serif;max-width:400px;margin:auto;padding:24px;border-radius:8px;background:#f9f9f9;border:1px solid #eee;">
         <h2 style="color:#2d7ff9;text-align:center;">USOF Password Reset</h2>
@@ -27,3 +27,5 @@ export class EmailUtils {
     `
   }
 }
+
+export const EmailUtils = new EmailUtilsClass()

@@ -19,6 +19,7 @@ const registrationTotpSchema = new mongoose.Schema(
     expiration: {
       type: Date,
       required: true,
+      expires: 0,
     },
     status: {
       type: String,
@@ -44,6 +45,66 @@ const registrationTotpSchema = new mongoose.Schema(
     toObject: {
       virtuals: true,
     },
+    statics: {
+      findValidByUser(userId) {
+        return this.findOne({
+          user: userId,
+          status: 'pending',
+          expiration: { $gt: new Date() },
+        }).populate('user')
+      },
+      createTotp(userId, values, expirationMinutes = 15, timeZone = 'UTC') {
+        const expiration = new Date(Date.now() + expirationMinutes * 60 * 1000)
+
+        return this.create({
+          user: userId,
+          values: values,
+          expiration: expiration,
+          status: 'pending',
+          time_zone: timeZone,
+        })
+      },
+      cleanupExpiredForUser(userId) {
+        return this.deleteMany({
+          user: userId,
+          $or: [
+            { expiration: { $lt: new Date() } },
+            { status: { $in: ['verified', 'expired', 'failed'] } },
+          ],
+        })
+      },
+    },
+    methods: {
+      isExpired() {
+        return this.expiration < new Date()
+      },
+      isValid() {
+        return this.status === 'pending' && !this.isExpired()
+      },
+      verifyValue(value) {
+        if (!this.isValid()) {
+          return false
+        }
+        return this.values.includes(value)
+      },
+      markVerified() {
+        this.status = 'verified'
+        this.updated = new Date()
+      },
+      markFailed() {
+        this.status = 'failed'
+        this.updated = new Date()
+      },
+      markExpired() {
+        this.status = 'expired'
+        this.updated = new Date()
+      },
+      getRemainingTime() {
+        const now = new Date()
+        const timeDiff = this.expiration - now
+        return timeDiff > 0 ? Math.ceil(timeDiff / (1000 * 60)) : 0
+      },
+    },
   },
 )
 
@@ -51,90 +112,6 @@ const registrationTotpSchema = new mongoose.Schema(
 registrationTotpSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
-
-// TTL index for automatic cleanup
-registrationTotpSchema.index({ expiration: 1 }, { expireAfterSeconds: 0 })
-
-// Static method to find valid TOTP by user
-registrationTotpSchema.statics.findValidByUser = function (userId) {
-  return this.findOne({
-    user: userId,
-    status: 'pending',
-    expiration: { $gt: new Date() },
-  }).populate('user')
-}
-
-// Static method to create new registration TOTP
-registrationTotpSchema.statics.createTotp = function (
-  userId,
-  values,
-  expirationMinutes = 15,
-  timeZone = 'UTC',
-) {
-  const expiration = new Date(Date.now() + expirationMinutes * 60 * 1000)
-
-  return this.create({
-    user: userId,
-    values: values,
-    expiration: expiration,
-    status: 'pending',
-    time_zone: timeZone,
-  })
-}
-
-// Static method to cleanup expired TOTPs for user
-registrationTotpSchema.statics.cleanupExpiredForUser = function (userId) {
-  return this.deleteMany({
-    user: userId,
-    $or: [
-      { expiration: { $lt: new Date() } },
-      { status: { $in: ['verified', 'expired', 'failed'] } },
-    ],
-  })
-}
-
-// Instance method to check if TOTP is expired
-registrationTotpSchema.methods.isExpired = function () {
-  return this.expiration < new Date()
-}
-
-// Instance method to check if TOTP is valid
-registrationTotpSchema.methods.isValid = function () {
-  return this.status === 'pending' && !this.isExpired()
-}
-
-// Instance method to verify value
-registrationTotpSchema.methods.verifyValue = function (value) {
-  if (!this.isValid()) {
-    return false
-  }
-  return this.values.includes(value)
-}
-
-// Instance method to mark as verified
-registrationTotpSchema.methods.markVerified = function () {
-  this.status = 'verified'
-  this.updated = new Date()
-}
-
-// Instance method to mark as failed
-registrationTotpSchema.methods.markFailed = function () {
-  this.status = 'failed'
-  this.updated = new Date()
-}
-
-// Instance method to mark as expired
-registrationTotpSchema.methods.markExpired = function () {
-  this.status = 'expired'
-  this.updated = new Date()
-}
-
-// Instance method to get remaining time in minutes
-registrationTotpSchema.methods.getRemainingTime = function () {
-  const now = new Date()
-  const timeDiff = this.expiration - now
-  return timeDiff > 0 ? Math.ceil(timeDiff / (1000 * 60)) : 0
-}
 
 export const RegistrationTotp = mongoose.model(
   'RegistrationTotp',

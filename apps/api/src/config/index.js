@@ -5,8 +5,9 @@ import { logConfiguration } from './logger/ConfigLogger.js'
 import { ConfigValidator } from './validator/ConfigValidator.js'
 
 /**
- * Рефакторенный класс конфигурации приложения
+ * Класс конфигурации приложения
  * Использует модульную архитектуру для лучшей читаемости и тестируемости
+ * @typedef {'development' | 'production' | 'test'} Environment
  */
 class AppConfigClass {
   #config
@@ -14,7 +15,8 @@ class AppConfigClass {
   #emailTransporter
 
   constructor() {
-    this.env = process.env.NODE_ENV || 'development'
+    /** @type {Environment} */
+    this.env = /** @type {Environment} */ (process.env.NODE_ENV || 'development')
     this.isProduction = this.env === 'production'
     this.isDevelopment = this.env === 'development'
     this.isTest = this.env === 'test'
@@ -33,7 +35,6 @@ class AppConfigClass {
 
   /**
    * Загружает и валидирует конфигурацию
-   * @private
    */
   #loadAndValidateConfig() {
     const result = this.#validator.validateAll()
@@ -49,7 +50,7 @@ class AppConfigClass {
   // СЕКЦИЯ: ПРИЛОЖЕНИЕ
   // =============================================================================
 
-  get PORT() {
+  get PORT () {
     return this.#config.app.BACK_PORT
   }
 
@@ -409,13 +410,6 @@ class AppConfigClass {
   // =============================================================================
 
   /**
-   * Валидирует конкретную переменную окружения
-   */
-  validateEnvVar(name, value, schema) {
-    return this.#validator.validateEnvVar(name, value, schema)
-  }
-
-  /**
    * Валидирует обязательные переменные окружения
    */
   validateRequired(requiredVars) {
@@ -432,21 +426,6 @@ class AppConfigClass {
    */
   hasEnv(name) {
     return process.env[name] !== undefined && process.env[name] !== ''
-  }
-
-  /**
-   * Возвращает сводку конфигурации (для отладки)
-   */
-  getSummary() {
-    return {
-      environment: this.env,
-      backend: `${this.HOST}:${this.PORT}`,
-      frontend: `${this.FRONT_HOST}:${this.FRONT_PORT}`,
-      database: this.DB_NAME,
-      hasJwtSecret: !!this.JWT_SECRET,
-      hasSmtpConfig: !!(this.SMTP_HOST && this.SMTP_USER),
-      hasOauthConfig: !!(this.OAUTH_CLIENT_ID && this.OAUTH_CLIENT_SECRET),
-    }
   }
 
   /**
