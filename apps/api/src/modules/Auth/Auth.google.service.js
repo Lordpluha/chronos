@@ -15,7 +15,7 @@ class GoogleAuthService {
     const baseUrl =
       process.env.NODE_ENV === 'production'
         ? `https://your-domain.com`
-        : `http://localhost:${process.env.BACK_PORT}`
+        : `http://${AppConfig.HOST}:${AppConfig.PORT}`
     const callbackUrl = `${baseUrl}/api/auth/google/callback`
     console.log('🔗 Google OAuth Callback URL:', callbackUrl)
     return callbackUrl

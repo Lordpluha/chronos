@@ -27,7 +27,6 @@ class AuthService {
 
     if (existingUser) {
       const err = new Error('User already exists')
-      err.status = 409
       throw err
     }
 
@@ -49,8 +48,9 @@ class AuthService {
    * @param {string} param0.password
    * @param {string} param0.token
    * @param {string|undefined} ipAddress
+   * @param {Object|undefined} deviceInfo
    */
-  async login({ login, password, token }, ipAddress) {
+  async login({ login, password, token }, ipAddress, deviceInfo) {
     // Find user by username or email
     const user = await User.findByEmailOrUsername(login)
 
@@ -89,12 +89,13 @@ class AuthService {
     const access_token = JWTUtils.generateAccessToken(user._id, user.login)
     const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
-    // Create session with IP address
+    // Create session with IP address and device info
     const session = new Session({
       user: user._id,
       access_token: access_token,
       refresh_token: refresh_token,
       ip_address: ipAddress,
+      device: deviceInfo,
     })
 
     await session.save()
@@ -225,9 +226,10 @@ class AuthService {
    * Поиск или создание пользователя через Google OAuth
    * @param {Object} googleUser - Данные пользователя от Google
    * @param {string} ipAddress - IP адрес пользователя
+   * @param {Object} deviceInfo - Информация о устройстве
    * @returns {Promise<Object>} Токены доступа
    */
-  async loginOrCreateGoogleUser(googleUser, ipAddress = null) {
+  async loginOrCreateGoogleUser(googleUser, ipAddress = null, deviceInfo = null) {
     const { googleId, email, name, given_name, family_name, picture } =
       googleUser
 
@@ -279,12 +281,13 @@ class AuthService {
     const access_token = JWTUtils.generateAccessToken(user._id, user.login)
     const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
-    // Create session with IP address
+    // Create session with IP address and device info
     const session = new Session({
       user: user._id,
       access_token: access_token,
       refresh_token: refresh_token,
       ip_address: ipAddress,
+      device: deviceInfo,
     })
 
     await session.save()
@@ -306,9 +309,10 @@ class AuthService {
    * @param {string} code - Код авторизации
    * @param {string} _state - State параметр для проверки CSRF (не используется)
    * @param {string} ipAddress - IP адрес пользователя
+   * @param {Object} deviceInfo - Информация о устройстве
    * @returns {Promise<Object>} Токены доступа
    */
-  async handleGoogleCallback(code, _state = null, ipAddress = null) {
+  async handleGoogleCallback(code, _state = null, ipAddress = null, deviceInfo = null) {
     try {
       // Получаем токены от Google
       const tokens = await googleAuthService.getTokens(code)
@@ -326,11 +330,10 @@ class AuthService {
       }
 
       // Создаем или находим пользователя
-      return await this.loginOrCreateGoogleUser(googleUser, ipAddress)
+      return await this.loginOrCreateGoogleUser(googleUser, ipAddress, deviceInfo)
     } catch (error) {
       console.error('Google OAuth error:', error)
-      const err = new Error('Google authentication failed')
-      throw err
+      throw error
     }
   }
 
@@ -403,14 +406,12 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 
     const isPasswordValid = await user.checkPassword(password)
     if (!isPasswordValid) {
       const err = new Error('Invalid password')
-      err.status = 401
       throw err
     }
 
@@ -543,7 +544,6 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 

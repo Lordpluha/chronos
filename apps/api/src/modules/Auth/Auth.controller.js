@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Router } from 'express'
 
 import {
@@ -11,13 +10,19 @@ import {
   requireAccessToken,
   requireRefreshToken,
 } from '../../middleware/index.js'
-import { JWTUtils, validateBody, validateParams } from '../../utils/index.js'
+import {
+  DeviceUtils,
+  JWTUtils,
+  validateBody,
+  validateParams,
+} from '../../utils/index.js'
 import { UsedOAuthCode } from '../../models/UsedOAuthCode.js'
 
 import { authService } from './Auth.service.js'
 import {
   disable2FASchema,
   enable2FASchema,
+  loginSchema,
   loginWith2FASchema,
   passwordResetRequestSchema,
   passwordResetSchema,
@@ -45,30 +50,22 @@ router.post(
 
 router.post(
   '/auth/login',
-  validateBody(loginWith2FASchema),
+  validateBody(loginSchema),
   async (req, res) => {
+    const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
+
     try {
-      let ipAddress =
-        req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress
-
-      const { access_token, refresh_token } = await authService.login(
-        req.body,
-        ipAddress,
-      )
-      res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
-      return res.json({ message: USER_LOGGED_IN })
-    } catch (err) {
-      res = JWTUtils.clearHttpOnlyCookie(res)
-
-      // Если требуется 2FA, возвращаем специальный статус
-      if (err.requires2FA) {
-        return res.status(422).json({
-          message: err.message,
+      const result = await authService.login(req.body, ipAddress, deviceInfo)
+      res.status(200).json(result)
+    } catch (error) {
+      if (error.requires2FA) {
+        return res.status(200).json({
           requires2FA: true,
+          message: error.message,
         })
       }
-
-      return res.status(err.status || 400).json({ message: err.message })
+      const statusCode = error.status || 400
+      res.status(statusCode).json({ error: error.message })
     }
   },
 )
@@ -194,11 +191,10 @@ router.get('/auth/google/callback', async (req, res) => {
     console.log('🔄 Processing Google OAuth callback...')
 
     // Обрабатываем callback и получаем токены
-    const ipAddress =
-      req.headers['x-forwarded-for'] || req.ip || req.connection.remoteAddress
+    const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
 
     const { access_token, refresh_token } =
-      await authService.handleGoogleCallback(code, state, ipAddress)
+      await authService.handleGoogleCallback(code, state, ipAddress, deviceInfo)
 
     // Устанавливаем токены в cookies
     res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
