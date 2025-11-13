@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema<import('./Reminder').IReminder, import('./Reminder').IReminderModel, import('./Reminder').IReminderMethods>}
+ */
 const reminderSchema = new mongoose.Schema(
   {
     title: {
@@ -62,6 +65,11 @@ const reminderSchema = new mongoose.Schema(
       [{ organizer: 1, start: 1 }],
     ],
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} calendarId
+       * @param {{ startDate?: Date; endDate?: Date }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByCalendar(calendarId, options = {}) {
         const query = this.find({ calendar: calendarId })
 
@@ -74,16 +82,28 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} creatorId
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByCreator(creatorId) {
         return this.find({ creator: creatorId }).populate(
           'creator organizer calendar',
         )
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} organizerId
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByOrganizer(organizerId) {
         return this.find({ organizer: organizerId }).populate(
           'creator organizer calendar',
         )
       },
+      /**
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string; userId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findOverdue(options = {}) {
         const query = this.find({ start: { $lt: new Date() } })
 
@@ -99,6 +119,11 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {number} [hours]
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string; userId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findUpcoming(hours = 24, options = {}) {
         const now = new Date()
         const future = new Date(now.getTime() + hours * 60 * 60 * 1000)
@@ -119,6 +144,12 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar').sort({ start: 1 })
       },
+      /**
+       * @param {Date} startDate
+       * @param {Date} endDate
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findInDateRange(startDate, endDate, options = {}) {
         const query = this.find({
           start: { $gte: startDate, $lte: endDate },
@@ -140,12 +171,14 @@ const reminderSchema = new mongoose.Schema(
       },
       shouldTrigger(minutesBefore = 0) {
         const now = new Date()
-        const triggerTime = new Date(this.start.getTime() - minutesBefore * 60 * 1000)
+        const triggerTime = new Date(
+          this.start.getTime() - minutesBefore * 60 * 1000,
+        )
         return now >= triggerTime && now <= this.start
       },
       getTimeUntil() {
         const now = new Date()
-        const timeDiff = this.start - now
+        const timeDiff = this.start.getTime() - now.getTime()
         return timeDiff > 0 ? timeDiff : 0
       },
     },
@@ -169,4 +202,5 @@ reminderSchema.virtual('isUpcoming').get(function () {
   return this.start > now && this.start <= tomorrow
 })
 
+/** @type {import('./Reminder').IReminderModel} */
 export const Reminder = mongoose.model('Reminder', reminderSchema)

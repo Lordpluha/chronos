@@ -36,4 +36,7 @@ const usedOAuthCodeSchema = new mongoose.Schema(
   },
 )
 
-export const UsedOAuthCode = mongoose.model('UsedOAuthCode', usedOAuthCodeSchema)
+export const UsedOAuthCode = mongoose.model(
+  'UsedOAuthCode',
+  usedOAuthCodeSchema,
+)

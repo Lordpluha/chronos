@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema<import('./Access').IAccess, import('./Access').IAccessModel, import('./Access').IAccessMethods>}
+ */
 const accessSchema = new mongoose.Schema(
   {
     user: {
@@ -31,9 +34,10 @@ const accessSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       validate: {
-        validator: (value) => {
+        validator: function (value) {
           // Format: {controls}.{type}.{uuid}
-          const pattern = /^(calendar|event|reminder|task)\.(create|read|update|delete|share)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          const pattern =
+            /^(calendar|event|reminder|task)\.(create|read|update|delete|share)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
           return pattern.test(value)
         },
         message: 'Name must follow format: {controls}.{type}.{uuid}',
@@ -57,12 +61,27 @@ const accessSchema = new mongoose.Schema(
       [{ entity_id: 1, controls: 1 }],
     ],
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {import('./Access').IAccessModel}
+       */
       findByUser(userId) {
         return this.find({ user: userId }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @this {import('./Access').IAccessModel}
+       */
       findByEntity(entityId) {
         return this.find({ entity_id: entityId }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} controls
+       * @param {string} type
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @this {import('./Access').IAccessModel}
+       */
       async hasAccess(userId, controls, type, entityId) {
         const access = await this.findOne({
           user: userId,
@@ -72,15 +91,38 @@ const accessSchema = new mongoose.Schema(
         })
         return !!access
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} controls
+       * @this {import('./Access').IAccessModel}
+       */
       findByUserAndControls(userId, controls) {
         return this.find({ user: userId, controls }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} type
+       * @this {import('./Access').IAccessModel}
+       */
       findByUserAndType(userId, type) {
         return this.find({ user: userId, type }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @param {string} controls
+       * @this {import('./Access').IAccessModel}
+       */
       findByEntityAndControls(entityId, controls) {
         return this.find({ entity_id: entityId, controls }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} controls
+       * @param {string} type
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @param {string} name
+       * @this {import('./Access').IAccessModel}
+       */
       async grantAccess(userId, controls, type, entityId, name) {
         const existingAccess = await this.findOne({
           user: userId,
@@ -101,6 +143,13 @@ const accessSchema = new mongoose.Schema(
           name,
         })
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} controls
+       * @param {string} type
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @this {import('./Access').IAccessModel}
+       */
       async revokeAccess(userId, controls, type, entityId) {
         return this.deleteOne({
           user: userId,
@@ -109,9 +158,17 @@ const accessSchema = new mongoose.Schema(
           entity_id: entityId,
         })
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} entityId
+       * @this {import('./Access').IAccessModel}
+       */
       async revokeAllAccessesForEntity(entityId) {
         return this.deleteMany({ entity_id: entityId })
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {import('./Access').IAccessModel}
+       */
       async revokeAllAccessesForUser(userId) {
         return this.deleteMany({ user: userId })
       },
@@ -124,4 +181,5 @@ accessSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
 
+/** @type {import('./Access').IAccessModel} */
 export const Access = mongoose.model('Access', accessSchema)

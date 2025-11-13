@@ -8,7 +8,10 @@ export const requireAccessToken = async (req, res, next) => {
     const { userId, username } = JWTUtils.verifyToken(access)
 
     // DB-check with MongoDB
-    const session = await Session.findOne({ user: userId, access_token: access })
+    const session = await Session.findOne({
+      user: userId,
+      access_token: access,
+    })
     if (!session) throw { status: 401, message: 'Access token revoked' }
 
     req.userId = userId
@@ -28,7 +31,10 @@ export const requireRefreshToken = async (req, res, next) => {
     const { userId, username } = JWTUtils.verifyToken(refresh)
 
     // DB-check with MongoDB
-    const session = await Session.findOne({ user: userId, refresh_token: refresh })
+    const session = await Session.findOne({
+      user: userId,
+      refresh_token: refresh,
+    })
     if (!session) throw { status: 401, message: 'Refresh token revoked' }
 
     req.userId = userId
@@ -53,7 +59,10 @@ export const optionalAccessToken = async (req, _res, next) => {
     const { userId, username } = JWTUtils.verifyToken(access)
 
     // DB-check with MongoDB
-    const session = await Session.findOne({ user: userId, access_token: access })
+    const session = await Session.findOne({
+      user: userId,
+      access_token: access,
+    })
 
     // Если токен валидный, устанавливаем userId
     if (session) {

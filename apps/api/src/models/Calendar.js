@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema<import('./Calendar').ICalendar, import('./Calendar').ICalendarModel, import('./Calendar').ICalendarMethods>}
+ */
 const calendarSchema = new mongoose.Schema(
   {
     title: {
@@ -96,12 +99,24 @@ const calendarSchema = new mongoose.Schema(
       virtuals: true,
     },
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} ownerId
+       * @this {import('./Calendar').ICalendarModel}
+       */
       findByOwner(ownerId) {
         return this.find({ owner: ownerId }).populate('owner creator')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} creatorId
+       * @this {import('./Calendar').ICalendarModel}
+       */
       findByCreator(creatorId) {
         return this.find({ creator: creatorId }).populate('owner creator')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {import('./Calendar').ICalendarModel}
+       */
       findAccessibleByUser(userId) {
         return this.find({
           $or: [
@@ -145,7 +160,7 @@ const calendarSchema = new mongoose.Schema(
           existingShare.shared_at = new Date()
         } else {
           this.shared_with.push({
-            user: userId,
+            user: /** @type {import('mongoose').Types.ObjectId} */ (userId),
             permission: permission,
             shared_at: new Date(),
           })
@@ -157,8 +172,9 @@ const calendarSchema = new mongoose.Schema(
         )
       },
       addEvent(eventId) {
-        if (!this.events.includes(eventId)) {
-          this.events.push(eventId)
+        const id = /** @type {import('mongoose').Types.ObjectId} */ (eventId)
+        if (!this.events.includes(id)) {
+          this.events.push(id)
         }
       },
       removeEvent(eventId) {
@@ -167,8 +183,9 @@ const calendarSchema = new mongoose.Schema(
         )
       },
       addReminder(reminderId) {
-        if (!this.reminders.includes(reminderId)) {
-          this.reminders.push(reminderId)
+        const id = /** @type {import('mongoose').Types.ObjectId} */ (reminderId)
+        if (!this.reminders.includes(id)) {
+          this.reminders.push(id)
         }
       },
       removeReminder(reminderId) {
@@ -185,4 +202,5 @@ calendarSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
 
+/** @type {import('./Calendar').ICalendarModel} */
 export const Calendar = mongoose.model('Calendar', calendarSchema)
