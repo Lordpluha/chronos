@@ -1,4 +1,4 @@
-import { RegistrationForm } from '@shared/components/registration-form'
+import { RegistrationForm } from '@shared/components/RegistrationForm'
 
 export const Registration = () => {
   return (

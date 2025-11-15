@@ -12,7 +12,7 @@ export function ProfilePage() {
     try {
       await logout();
       toast.success('Logged out successfully');
-      navigate('/login');
+      navigate('/auth/login');
     } catch (error) {
       toast.error('Logout failed');
     }
@@ -27,7 +27,7 @@ export function ProfilePage() {
   }
 
   if (!user) {
-    navigate('/login');
+    navigate('/auth/login');
     return null;
   }
 
