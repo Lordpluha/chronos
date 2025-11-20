@@ -13,7 +13,7 @@ export interface IAccess {
 
 // Access model has no instance methods
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export type IAccessMethods = {}
+export interface IAccessMethods {}
 
 export type IAccessDocument = HydratedDocument<IAccess, IAccessMethods>
 
