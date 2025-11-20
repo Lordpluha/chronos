@@ -9,6 +9,7 @@ import { Button } from "@shared/ui/button";
 import { Field, FieldGroup, FieldLabel, FieldError } from "@shared/ui/field";
 import { Input } from "@shared/ui/input";
 import { ROUTES } from "@shared/routes";
+import { authApi } from "@shared/api/auth";
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -37,19 +38,7 @@ export function ForgotPasswordForm({ className, ...props }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/password-reset', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email: data.email }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Error sending code');
-      }
+      await authApi.requestPasswordReset(data.email);
 
       setSuccess(true);
       toast.success("Reset code sent to your email!");
@@ -59,7 +48,7 @@ export function ForgotPasswordForm({ className, ...props }) {
       }, 2000);
     } catch (error) {
       console.error("Forgot password error:", error);
-      toast.error(error.message || "Failed to send reset code. Please try again.");
+      toast.error(error.response?.data?.message || error.message || "Failed to send reset code. Please try again.");
     } finally {
       setIsLoading(false);
     }
