@@ -17,8 +17,8 @@
     "docker:logs": "docker compose logs -f",
     "docker:db": "docker compose --profile development up mongodb -d"
   },
+  "dependencies": {},
   "devDependencies": {
-    "@biomejs/cli-linux-x64": "^2.3.6",
     "turbo": "^2.6.0"
   },
   "engines": {
