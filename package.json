@@ -17,7 +17,9 @@
     "docker:logs": "docker compose logs -f",
     "docker:db": "docker compose --profile development up mongodb -d"
   },
-  "dependencies": {},
+  "dependencies": {
+    "dayjs": "^1.11.19"
+  },
   "devDependencies": {
     "turbo": "^2.6.0"
   },

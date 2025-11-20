@@ -1,0 +1,3 @@
+.weekGrid {
+  grid-template-columns: 80px repeat(7, 1fr);
+}
