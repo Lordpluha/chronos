@@ -131,16 +131,18 @@ const calendarSchema = new mongoose.Schema(
       hasAccess(userId, requiredPermission = 'read') {
         const userIdStr = userId.toString()
 
-        if (
-          this.owner.toString() === userIdStr ||
-          this.creator.toString() === userIdStr
-        ) {
+        // Безопасное получение ID владельца и создателя
+        const ownerId = this.owner?._id ? this.owner._id.toString() : this.owner.toString()
+        const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
+
+        if (ownerId === userIdStr || creatorId === userIdStr) {
           return true
         }
 
-        const sharedAccess = this.shared_with.find(
-          (share) => share.user.toString() === userIdStr,
-        )
+        const sharedAccess = this.shared_with.find((share) => {
+          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          return shareUserId === userIdStr
+        })
 
         if (!sharedAccess) return false
 
@@ -151,9 +153,11 @@ const calendarSchema = new mongoose.Schema(
         return userPermissionLevel >= requiredPermissionLevel
       },
       shareWith(userId, permission = 'read') {
-        const existingShare = this.shared_with.find(
-          (share) => share.user.toString() === userId.toString(),
-        )
+        const userIdStr = userId.toString()
+        const existingShare = this.shared_with.find((share) => {
+          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          return shareUserId === userIdStr
+        })
 
         if (existingShare) {
           existingShare.permission = permission
@@ -167,9 +171,11 @@ const calendarSchema = new mongoose.Schema(
         }
       },
       removeSharedAccess(userId) {
-        this.shared_with = this.shared_with.filter(
-          (share) => share.user.toString() !== userId.toString(),
-        )
+        const userIdStr = userId.toString()
+        this.shared_with = this.shared_with.filter((share) => {
+          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          return shareUserId !== userIdStr
+        })
       },
       addEvent(eventId) {
         const id = /** @type {import('mongoose').Types.ObjectId} */ (eventId)

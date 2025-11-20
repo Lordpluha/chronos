@@ -164,10 +164,13 @@ const reminderSchema = new mongoose.Schema(
     },
     methods: {
       hasAccess(userId) {
-        return (
-          this.creator.toString() === userId.toString() ||
-          this.organizer.toString() === userId.toString()
-        )
+        const userIdStr = userId.toString()
+        
+        // Безопасное получение ID создателя и организатора
+        const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
+        const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
+        
+        return creatorId === userIdStr || organizerId === userIdStr
       },
       shouldTrigger(minutesBefore = 0) {
         const now = new Date()

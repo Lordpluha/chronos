@@ -55,8 +55,11 @@ router.post(
     const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
 
     try {
-      const result = await authService.login(req.body, ipAddress, deviceInfo)
-      res.status(200).json(result)
+      const { access_token, refresh_token } = await authService.login(req.body, ipAddress, deviceInfo)
+      res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
+      res.status(200).json({
+        message: USER_LOGGED_IN
+      })
     } catch (error) {
       if (error.requires2FA) {
         return res.status(200).json({

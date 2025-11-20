@@ -2,12 +2,21 @@ import { AppConfig } from '../config/index.js'
 import { Session } from '../models/Session.js'
 import { JWTUtils } from '../utils/index.js'
 
+/**
+ * Middleware для проверки access токена
+ * После успешной проверки добавляет в req: userId, username, accessCookie
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
 export const requireAccessToken = async (req, res, next) => {
+	/**
+	 * @type {string | undefined}
+	 */
   const access = req.cookies?.[AppConfig.ACCESS_TOKEN_NAME]
   try {
     const { userId, username } = JWTUtils.verifyToken(access)
 
-    // DB-check with MongoDB
     const session = await Session.findOne({
       user: userId,
       access_token: access,
@@ -19,13 +28,22 @@ export const requireAccessToken = async (req, res, next) => {
     req.accessCookie = access
     next()
   } catch (err) {
-    return res
-      .status(err.status || 401)
-      .json({ message: err.message || 'Invalid token' })
+    console.log('Access token validation failed:', err.message)
+    return res.status(401)
   }
 }
 
+/**
+ * Middleware для проверки refresh токена
+ * После успешной проверки добавляет в req: userId, username, refreshCookie
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
 export const requireRefreshToken = async (req, res, next) => {
+  /**
+   * @type {string | undefined}
+   */
   const refresh = req.cookies?.[AppConfig.REFRESH_TOKEN_NAME]
   try {
     const { userId, username } = JWTUtils.verifyToken(refresh)
@@ -42,11 +60,17 @@ export const requireRefreshToken = async (req, res, next) => {
     req.refreshCookie = refresh
     next()
   } catch (err) {
-    return res.status(err.status || 401).json({ message: err.message })
+		console.log('Refresh token validation failed:', err.message)
+    return res.status(401)
   }
 }
 
-// Опциональная проверка токена - не требует авторизации, но если токен есть, устанавливает req.userId
+/**
+ * Опциональная проверка токена - не требует авторизации, но если токен есть, устанавливает req.userId
+ * @param {import('express').Request} req
+ * @param {import('express').Response} _res
+ * @param {import('express').NextFunction} next
+ */
 export const optionalAccessToken = async (req, _res, next) => {
   const access = req.cookies?.[AppConfig.ACCESS_TOKEN_NAME]
 

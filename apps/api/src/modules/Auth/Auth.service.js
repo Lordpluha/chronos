@@ -9,6 +9,7 @@ import {
   INVALID_OR_EXPIRED_CODE,
   INVALID_USERNAME_OR_PASSWORD,
   REFRESH_TOKEN_MISSING,
+	USER_ALREADY_EXISTS,
 } from '../../messages/index.js'
 import {
   DateTimeUtils,
@@ -26,7 +27,7 @@ class AuthService {
     })
 
     if (existingUser) {
-      const err = new Error('User already exists')
+      const err = new Error(USER_ALREADY_EXISTS)
       throw err
     }
 

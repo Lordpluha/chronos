@@ -185,7 +185,7 @@ class AppConfigClass {
    */
   getCookieOptions(type) {
     return {
-      httpOnly: type !== 'access',
+      httpOnly: true,
       secure: this.env === 'production',
       sameSite: 'lax',
       maxAge:

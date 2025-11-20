@@ -228,10 +228,13 @@ const eventSchema = new mongoose.Schema(
        * @param {import('mongoose').Types.ObjectId | string} userId
        */
       hasAccess(userId) {
-        return (
-          this.creator.toString() === userId.toString() ||
-          this.organizer.toString() === userId.toString()
-        )
+        const userIdStr = userId.toString()
+        
+        // Безопасное получение ID создателя и организатора
+        const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
+        const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
+        
+        return creatorId === userIdStr || organizerId === userIdStr
       },
 
       isActive() {
@@ -254,7 +257,8 @@ const eventSchema = new mongoose.Schema(
       addAttendee(userIdOrEmail, isUser = true) {
         const existingIndex = this.attendees.findIndex((attendee) => {
           if (isUser && attendee.user) {
-            return attendee.user.toString() === userIdOrEmail.toString()
+            const attendeeUserId = attendee.user?._id ? attendee.user._id.toString() : attendee.user.toString()
+            return attendeeUserId === userIdOrEmail.toString()
           }
           return attendee.email === userIdOrEmail
         })
@@ -282,7 +286,8 @@ const eventSchema = new mongoose.Schema(
       updateAttendeeStatus(userIdOrEmail, status, isUser = true) {
         const attendeeIndex = this.attendees.findIndex((attendee) => {
           if (isUser && attendee.user) {
-            return attendee.user.toString() === userIdOrEmail.toString()
+            const attendeeUserId = attendee.user?._id ? attendee.user._id.toString() : attendee.user.toString()
+            return attendeeUserId === userIdOrEmail.toString()
           }
           return attendee.email === userIdOrEmail
         })
@@ -301,7 +306,8 @@ const eventSchema = new mongoose.Schema(
       removeAttendee(userIdOrEmail, isUser = true) {
         this.attendees = this.attendees.filter((attendee) => {
           if (isUser && attendee.user) {
-            return attendee.user.toString() !== userIdOrEmail.toString()
+            const attendeeUserId = attendee.user?._id ? attendee.user._id.toString() : attendee.user.toString()
+            return attendeeUserId !== userIdOrEmail.toString()
           }
           return attendee.email !== userIdOrEmail
         })
