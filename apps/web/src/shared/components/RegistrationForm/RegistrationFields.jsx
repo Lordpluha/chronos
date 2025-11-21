@@ -1,7 +1,6 @@
 import React from "react";
 import { Field, FieldLabel, FieldError } from "@shared/ui/field";
 import { Input } from "@shared/ui/input";
-import { PasswordField } from "../common/PasswordField";
 
 export function RegistrationFields({ register, errors, isLoading }) {
   const [showPassword, setShowPassword] = React.useState(false);
