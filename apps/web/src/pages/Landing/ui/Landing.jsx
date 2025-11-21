@@ -54,7 +54,7 @@ export const Landing = () => {
               size="lg"
               className="px-8 py-6 text-lg"
             >
-              Lets Go
+              Let's Go
               <img src="/arrow-up.svg" alt="" />
             </Button>
           </div>
