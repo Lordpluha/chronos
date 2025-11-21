@@ -210,9 +210,9 @@ router.get('/auth/google/callback', async (req, res) => {
 
     console.log(
       '✅ Google OAuth successful, redirecting to:',
-      `${frontendUrl}/profile`,
+      `${frontendUrl}/calendar`,
     )
-    return res.redirect(`${frontendUrl}/profile`)
+    return res.redirect(`${frontendUrl}/calendar`)
   } catch (err) {
     console.error('❌ Google OAuth callback error:', err)
 
