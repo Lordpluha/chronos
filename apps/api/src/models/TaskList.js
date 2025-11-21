@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema<import('./TaskList').ITaskList, import('./TaskList').ITaskListModel, import('./TaskList').ITaskListMethods>}
+ */
 const taskListSchema = new mongoose.Schema(
   {
     creator: {
@@ -38,10 +41,13 @@ const taskListSchema = new mongoose.Schema(
     toObject: {
       virtuals: true,
     },
-    indexes: [
-      [{ name: 'text', description: 'text' }],
-    ],
+    indexes: [[{ name: 'text', description: 'text' }]],
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} creatorId
+       * @param {{ populateTasks?: boolean }} [options]
+       * @this {import('./TaskList').ITaskListModel}
+       */
       findByCreator(creatorId, options = {}) {
         const query = this.find({ creator: creatorId })
 
@@ -51,6 +57,10 @@ const taskListSchema = new mongoose.Schema(
 
         return query.populate('creator')
       },
+      /**
+       * @param {Record<string, unknown>} [filter]
+       * @this {import('./TaskList').ITaskListModel}
+       */
       findWithTasks(filter = {}) {
         return this.find(filter)
           .populate('creator')
@@ -74,37 +84,6 @@ const taskListSchema = new mongoose.Schema(
       hasAccess(userId) {
         return this.creator.toString() === userId.toString()
       },
-      getStatistics() {
-        if (!this.populated('tasks')) {
-          return {
-            total: this.tasks.length,
-            completed: null,
-            pending: null,
-            overdue: null,
-          }
-        }
-
-        const now = new Date()
-        const stats = {
-          total: this.tasks.length,
-          completed: 0,
-          pending: 0,
-          overdue: 0,
-        }
-
-        this.tasks.forEach((task) => {
-          if (task.completed) {
-            stats.completed++
-          } else {
-            stats.pending++
-            if (task.end && task.end < now) {
-              stats.overdue++
-            }
-          }
-        })
-
-        return stats
-      },
       reorderTasks(taskIds) {
         // Validate that all task IDs belong to this list
         const currentTaskIds = this.tasks.map((id) => id.toString())
@@ -113,7 +92,7 @@ const taskListSchema = new mongoose.Schema(
         )
 
         if (validIds.length === currentTaskIds.length) {
-          this.tasks = validIds
+          this.tasks = validIds.map(id => new mongoose.Types.ObjectId(id))
         }
       },
     },
@@ -130,17 +109,6 @@ taskListSchema.virtual('totalTasks').get(function () {
   return this.tasks.length
 })
 
-// Virtual for completed tasks count (requires populated tasks)
-taskListSchema.virtual('completedTasksCount').get(function () {
-  if (!this.populated('tasks')) return null
-  return this.tasks.filter((task) => task.completed).length
-})
 
-// Virtual for progress percentage (requires populated tasks)
-taskListSchema.virtual('progressPercentage').get(function () {
-  if (!this.populated('tasks') || this.tasks.length === 0) return 0
-  const completed = this.tasks.filter((task) => task.completed).length
-  return Math.round((completed / this.tasks.length) * 100)
-})
-
+/** @type {import('./TaskList').ITaskListModel} */
 export const TaskList = mongoose.model('TaskList', taskListSchema)

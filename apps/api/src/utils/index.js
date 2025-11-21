@@ -1,4 +1,5 @@
 export * from './DateTimeUtils.js'
+export * from './DeviceUtils.js'
 export * from './EmailUtils.js'
 export * from './generate-code.js'
 export * from './JWTUtls.js'

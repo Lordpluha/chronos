@@ -2,7 +2,6 @@ import { z } from 'zod'
 
 // Базовые схемы для повторного использования
 const emailSchema = z
-  .string()
   .email('Invalid email format')
   .max(255, 'Email must be less than 255 characters')
   .toLowerCase()
@@ -42,7 +41,11 @@ export const registerSchema = z.object({
   login: loginFieldSchema,
   email: emailSchema,
   password: passwordSchema,
-	full_name: z.string().min(1, 'Full name is required').max(100, 'Full name must be less than 100 characters').trim(),
+  full_name: z
+    .string()
+    .min(1, 'Full name is required')
+    .max(100, 'Full name must be less than 100 characters')
+    .trim(),
 })
 
 export const loginSchema = z.object({

@@ -1,5 +1,6 @@
 export * from './auth.messages.js'
 export * from './user.messages.js'
+export * from './calendar.messages.js'
 
 // General messages
 export const ACCESS_DENIED = 'Access denied'

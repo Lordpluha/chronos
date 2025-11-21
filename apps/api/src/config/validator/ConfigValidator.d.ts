@@ -195,9 +195,7 @@ export declare class ConfigValidator {
    * const result = validator.validateAll(testEnv)
    * ```
    */
-  validateAll(
-    envVars?: Record<string, string | undefined>,
-  ): ValidationResult
+  validateAll(envVars?: Record<string, string | undefined>): ValidationResult
 
   /**
    * Валидирует конкретную переменную окружения
