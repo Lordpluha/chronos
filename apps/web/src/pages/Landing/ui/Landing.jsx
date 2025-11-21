@@ -40,7 +40,7 @@ export const Landing = () => {
               Join to
             </h1>
             <h2 className="text-5xl font-bold mb-6">
-              Chronosom
+              Chronos
             </h2>
 
             <div className="mb-8">
