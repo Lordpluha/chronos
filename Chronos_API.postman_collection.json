@@ -1,0 +1,961 @@
+{
+	"info": {
+		"_postman_id": "chronos-api-collection",
+		"name": "Chronos API",
+		"description": "API коллекция для Chronos Calendar приложения",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{access_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3001/api",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "calendar_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "event_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reminder_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Registration",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"login\": \"testuser\",\n  \"email\": \"test@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"full_name\": \"Test User\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/registration",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "registration"]
+						},
+						"description": "Регистрация нового пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200 && !pm.response.json().requires2FA) {",
+									"    // Токены устанавливаются через HTTP-only cookies",
+									"    pm.collectionVariables.set(\"access_token\", \"token_from_cookie\");",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"login\": \"testuser\",\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Вход в систему (токены устанавливаются через HTTP-only cookies)"
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/refresh",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "refresh"]
+						},
+						"description": "Обновление access token (требуется refresh token в cookies)"
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						},
+						"description": "Выход из системы"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/me",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "me"]
+						},
+						"description": "Получить информацию о текущем пользователе"
+					},
+					"response": []
+				},
+				{
+					"name": "Password Reset Request",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/password-reset",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "password-reset"]
+						},
+						"description": "Запрос на сброс пароля (отправка кода на email)"
+					},
+					"response": []
+				},
+				{
+					"name": "Password Reset",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"NewSecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/password-reset/:token",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "password-reset", ":token"],
+							"variable": [
+								{
+									"key": "token",
+									"value": "reset_token_from_email"
+								}
+							]
+						},
+						"description": "Сброс пароля с токеном из email"
+					},
+					"response": []
+				},
+				{
+					"name": "Google OAuth",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/google",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "google"]
+						},
+						"description": "Инициация OAuth авторизации через Google"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для аутентификации и авторизации"
+		},
+		{
+			"name": "2FA",
+			"item": [
+				{
+					"name": "Setup 2FA",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/2fa/setup",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "2fa", "setup"]
+						},
+						"description": "Настройка 2FA - получение QR кода и секретного ключа"
+					},
+					"response": []
+				},
+				{
+					"name": "Enable 2FA",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"123456\",\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/2fa/enable",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "2fa", "enable"]
+						},
+						"description": "Включение 2FA после верификации токена"
+					},
+					"response": []
+				},
+				{
+					"name": "Disable 2FA",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"SecurePass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/2fa/disable",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "2fa", "disable"]
+						},
+						"description": "Отключение двухфакторной аутентификации"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify 2FA Token",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"token\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/2fa/verify",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "2fa", "verify"]
+						},
+						"description": "Проверка валидности 2FA токена"
+					},
+					"response": []
+				},
+				{
+					"name": "Get 2FA Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/auth/2fa/status",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "2fa", "status"]
+						},
+						"description": "Получить статус двухфакторной аутентификации"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для двухфакторной аутентификации"
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"full_name\": \"Updated Name\",\n  \"avatar\": \"https://example.com/avatar.jpg\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/me",
+							"host": ["{{base_url}}"],
+							"path": ["users", "me"]
+						},
+						"description": "Обновить профиль текущего пользователя"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для управления пользователями"
+		},
+		{
+			"name": "Calendars",
+			"item": [
+				{
+					"name": "Get All Calendars",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars",
+							"host": ["{{base_url}}"],
+							"path": ["calendars"]
+						},
+						"description": "Получить все календари пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Calendar",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"calendar_id\", response.calendar.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Work Calendar\",\n  \"description\": \"Calendar for work events\",\n  \"color\": \"#FF5733\",\n  \"timezone\": \"Europe/Kiev\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/calendars",
+							"host": ["{{base_url}}"],
+							"path": ["calendars"]
+						},
+						"description": "Создать новый календарь"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Calendar by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Получить календарь по ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Calendar",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Updated Calendar Name\",\n  \"color\": \"#3498db\",\n  \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Обновить календарь"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Calendar",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Удалить календарь"
+					},
+					"response": []
+				},
+				{
+					"name": "Share Calendar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"colleague@example.com\",\n  \"accessLevel\": \"read\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId/share",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId", "share"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Поделиться календарем с другим пользователем"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Calendar Access",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"colleague@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId/share",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId", "share"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Удалить доступ к календарю"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для управления календарями"
+		},
+		{
+			"name": "Events",
+			"item": [
+				{
+					"name": "Get All User Events",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events?startDate=2025-01-01&endDate=2025-12-31",
+							"host": ["{{base_url}}"],
+							"path": ["events"],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "2025-01-01"
+								},
+								{
+									"key": "endDate",
+									"value": "2025-12-31"
+								}
+							]
+						},
+						"description": "Получить все события пользователя с фильтрами"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Calendar Events",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId/events",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId", "events"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Получить события конкретного календаря"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Event",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"event_id\", response.event.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"calendar_id\": \"{{calendar_id}}\",\n  \"title\": \"Team Meeting\",\n  \"description\": \"Weekly team sync\",\n  \"start\": \"2025-11-25T10:00:00Z\",\n  \"end\": \"2025-11-25T11:00:00Z\",\n  \"location\": {\n    \"name\": \"Conference Room A\",\n    \"address\": \"123 Main St, Building A\"\n  },\n  \"is_all_day\": false,\n  \"status\": \"confirmed\",\n  \"time_zone\": \"UTC\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events",
+							"host": ["{{base_url}}"],
+							"path": ["events"]
+						},
+						"description": "Создать новое событие"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Event by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events/:eventId",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								}
+							]
+						},
+						"description": "Получить событие по ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Event",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Meeting Title\",\n  \"start\": \"2025-11-25T14:00:00Z\",\n  \"end\": \"2025-11-25T15:00:00Z\",\n  \"description\": \"Updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events/:eventId",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								}
+							]
+						},
+						"description": "Обновить событие"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Event",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events/:eventId",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								}
+							]
+						},
+						"description": "Удалить событие"
+					},
+					"response": []
+				},
+				{
+					"name": "Add Attendee",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"attendee@example.com\",\n  \"status\": \"pending\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events/:eventId/attendees",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId", "attendees"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								}
+							]
+						},
+						"description": "Добавить участника к событию"
+					},
+					"response": []
+				},
+				{
+					"name": "Update My Attendee Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"accepted\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events/:eventId/attendees/me",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId", "attendees", "me"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								}
+							]
+						},
+						"description": "Обновить свой статус участия в событии (accepted/declined/tentative)"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Attendee",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/events/:eventId/attendees/:attendeeId",
+							"host": ["{{base_url}}"],
+							"path": ["events", ":eventId", "attendees", ":attendeeId"],
+							"variable": [
+								{
+									"key": "eventId",
+									"value": "{{event_id}}"
+								},
+								{
+									"key": "attendeeId",
+									"value": "attendee_id_here"
+								}
+							]
+						},
+						"description": "Удалить участника из события"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для управления событиями"
+		},
+		{
+			"name": "Reminders",
+			"item": [
+				{
+					"name": "Get All User Reminders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/reminders",
+							"host": ["{{base_url}}"],
+							"path": ["reminders"]
+						},
+						"description": "Получить все напоминания пользователя"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Calendar Reminders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId/reminders",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId", "reminders"],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Получить напоминания конкретного календаря"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Reminder",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"reminder_id\", response.reminder.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"calendar_id\": \"{{calendar_id}}\",\n  \"title\": \"Important Reminder\",\n  \"description\": \"Don't forget this task\",\n  \"start\": \"2025-11-25T09:00:00Z\",\n  \"time_zone\": \"UTC\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reminders",
+							"host": ["{{base_url}}"],
+							"path": ["reminders"]
+						},
+						"description": "Создать новое напоминание"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reminder by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/reminders/:reminderId",
+							"host": ["{{base_url}}"],
+							"path": ["reminders", ":reminderId"],
+							"variable": [
+								{
+									"key": "reminderId",
+									"value": "{{reminder_id}}"
+								}
+							]
+						},
+						"description": "Получить напоминание по ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Reminder",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Reminder\",\n  \"description\": \"Updated description\",\n  \"start\": \"2025-11-25T10:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reminders/:reminderId",
+							"host": ["{{base_url}}"],
+							"path": ["reminders", ":reminderId"],
+							"variable": [
+								{
+									"key": "reminderId",
+									"value": "{{reminder_id}}"
+								}
+							]
+						},
+						"description": "Обновить напоминание"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Reminder",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/reminders/:reminderId",
+							"host": ["{{base_url}}"],
+							"path": ["reminders", ":reminderId"],
+							"variable": [
+								{
+									"key": "reminderId",
+									"value": "{{reminder_id}}"
+								}
+							]
+						},
+						"description": "Удалить напоминание"
+					},
+					"response": []
+				}
+			],
+			"description": "Эндпоинты для управления напоминаниями"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

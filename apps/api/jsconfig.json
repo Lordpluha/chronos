@@ -53,11 +53,7 @@
     "sourceMap": false,
     "declaration": false
   },
-  "include": [
-    "src/**/*",
-    "src/**/*.json",
-    "*.config.js"
-  ],
+  "include": ["src/**/*", "src/**/*.json", "*.config.js"],
   "exclude": [
     "node_modules",
     "dist",
@@ -69,11 +65,6 @@
   ],
   "typeAcquisition": {
     "enable": true,
-    "include": [
-      "node",
-      "express",
-      "mongoose",
-      "jsonwebtoken"
-    ]
+    "include": ["node", "express", "mongoose", "jsonwebtoken"]
   }
 }

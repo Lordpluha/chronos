@@ -1,5 +1,14 @@
 import mongoose from 'mongoose'
 
+/**
+ * @typedef {import('./RegistrationTotp').IRegistrationTotp} IRegistrationTotp
+ * @typedef {import('./RegistrationTotp').IRegistrationTotpMethods} IRegistrationTotpMethods
+ * @typedef {import('./RegistrationTotp').IRegistrationTotpModel} IRegistrationTotpModel
+ */
+
+/**
+ * @type {mongoose.Schema<IRegistrationTotp, IRegistrationTotpModel, IRegistrationTotpMethods>}
+ */
 const registrationTotpSchema = new mongoose.Schema(
   {
     user: {
@@ -46,6 +55,10 @@ const registrationTotpSchema = new mongoose.Schema(
       virtuals: true,
     },
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {IRegistrationTotpModel}
+       */
       findValidByUser(userId) {
         return this.findOne({
           user: userId,
@@ -53,6 +66,13 @@ const registrationTotpSchema = new mongoose.Schema(
           expiration: { $gt: new Date() },
         }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string[]} values
+       * @param {number} [expirationMinutes]
+       * @param {string} [timeZone]
+       * @this {IRegistrationTotpModel}
+       */
       createTotp(userId, values, expirationMinutes = 15, timeZone = 'UTC') {
         const expiration = new Date(Date.now() + expirationMinutes * 60 * 1000)
 
@@ -64,6 +84,10 @@ const registrationTotpSchema = new mongoose.Schema(
           time_zone: timeZone,
         })
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {IRegistrationTotpModel}
+       */
       cleanupExpiredForUser(userId) {
         return this.deleteMany({
           user: userId,
@@ -79,10 +103,10 @@ const registrationTotpSchema = new mongoose.Schema(
         return this.expiration < new Date()
       },
       isValid() {
-        return this.status === 'pending' && !this.isExpired()
+        return this.status === 'pending' && this.expiration >= new Date()
       },
       verifyValue(value) {
-        if (!this.isValid()) {
+        if (this.status !== 'pending' || this.expiration < new Date()) {
           return false
         }
         return this.values.includes(value)
@@ -101,7 +125,7 @@ const registrationTotpSchema = new mongoose.Schema(
       },
       getRemainingTime() {
         const now = new Date()
-        const timeDiff = this.expiration - now
+        const timeDiff = this.expiration.getTime() - now.getTime()
         return timeDiff > 0 ? Math.ceil(timeDiff / (1000 * 60)) : 0
       },
     },
@@ -113,6 +137,7 @@ registrationTotpSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
 
+/** @type {IRegistrationTotpModel} */
 export const RegistrationTotp = mongoose.model(
   'RegistrationTotp',
   registrationTotpSchema,

@@ -1,5 +1,14 @@
 import mongoose from 'mongoose'
 
+/**
+ * @typedef {import('./PasswordResetOtp').IPasswordResetOtp} IPasswordResetOtp
+ * @typedef {import('./PasswordResetOtp').IPasswordResetOtpMethods} IPasswordResetOtpMethods
+ * @typedef {import('./PasswordResetOtp').IPasswordResetOtpModel} IPasswordResetOtpModel
+ */
+
+/**
+ * @type {mongoose.Schema<IPasswordResetOtp, IPasswordResetOtpModel, IPasswordResetOtpMethods>}
+ */
 const passwordResetOtpSchema = new mongoose.Schema(
   {
     user: {
@@ -31,6 +40,11 @@ const passwordResetOtpSchema = new mongoose.Schema(
       virtuals: true,
     },
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} code
+       * @this {IPasswordResetOtpModel}
+       */
       findValidOtp(userId, code) {
         return this.findOne({
           user: userId,
@@ -38,6 +52,12 @@ const passwordResetOtpSchema = new mongoose.Schema(
           expires_at: { $gt: new Date() },
         }).populate('user')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @param {string} code
+       * @param {number} [expirationMinutes]
+       * @this {IPasswordResetOtpModel}
+       */
       createOtp(userId, code, expirationMinutes = 15) {
         const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000)
 
@@ -47,6 +67,10 @@ const passwordResetOtpSchema = new mongoose.Schema(
           expires_at: expiresAt,
         })
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {IPasswordResetOtpModel}
+       */
       cleanupExpiredForUser(userId) {
         return this.deleteMany({
           user: userId,
@@ -59,11 +83,11 @@ const passwordResetOtpSchema = new mongoose.Schema(
         return this.expires_at < new Date()
       },
       isValid() {
-        return !this.isExpired()
+        return this.expires_at >= new Date()
       },
       getRemainingTime() {
         const now = new Date()
-        const timeDiff = this.expires_at - now
+        const timeDiff = this.expires_at.getTime() - now.getTime()
         return timeDiff > 0 ? Math.ceil(timeDiff / (1000 * 60)) : 0
       },
     },
@@ -75,6 +99,7 @@ passwordResetOtpSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
 
+/** @type {IPasswordResetOtpModel} */
 export const PasswordResetOtp = mongoose.model(
   'PasswordResetOtp',
   passwordResetOtpSchema,

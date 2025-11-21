@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema}
+ */
 const attachmentSchema = new mongoose.Schema(
   {
     filename: {
@@ -30,6 +33,9 @@ const attachmentSchema = new mongoose.Schema(
   { _id: true },
 )
 
+/**
+ * @type {mongoose.Schema<import('./Task').ITask, import('./Task').ITaskModel, import('./Task').ITaskMethods>}
+ */
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -115,6 +121,10 @@ const taskSchema = new mongoose.Schema(
       [{ completed: 1, priority: 1, end: 1 }],
     ],
     statics: {
+      /**
+       * @param {{ startDate?: Date; endDate?: Date }} [options]
+       * @this {import('./Task').ITaskModel}
+       */
       findCompleted(options = {}) {
         const query = this.find({ completed: true })
 
@@ -127,6 +137,10 @@ const taskSchema = new mongoose.Schema(
 
         return query.sort({ updated: -1 })
       },
+      /**
+       * @param {{ dueBefore?: Date; startAfter?: Date }} [options]
+       * @this {import('./Task').ITaskModel}
+       */
       findPending(options = {}) {
         const query = this.find({ completed: false })
 
@@ -140,12 +154,18 @@ const taskSchema = new mongoose.Schema(
 
         return query.sort({ end: 1, start: 1 })
       },
+      /**
+       * @this {import('./Task').ITaskModel}
+       */
       findOverdue() {
         return this.find({
           completed: false,
           end: { $lt: new Date() },
         }).sort({ end: 1 })
       },
+      /**
+       * @this {import('./Task').ITaskModel}
+       */
       findDueToday() {
         const today = new Date()
         const startOfDay = new Date(
@@ -164,6 +184,10 @@ const taskSchema = new mongoose.Schema(
           end: { $gte: startOfDay, $lt: endOfDay },
         }).sort({ end: 1 })
       },
+      /**
+       * @param {number} [days]
+       * @this {import('./Task').ITaskModel}
+       */
       findUpcoming(days = 7) {
         const now = new Date()
         const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
@@ -173,12 +197,23 @@ const taskSchema = new mongoose.Schema(
           end: { $gte: now, $lte: future },
         }).sort({ end: 1 })
       },
+      /**
+       * @param {'low' | 'medium' | 'high' | 'urgent'} priority
+       * @this {import('./Task').ITaskModel}
+       */
       findByPriority(priority) {
         return this.find({ priority, completed: false }).sort({ end: 1 })
       },
+      /**
+       * @param {string[]} tags
+       * @this {import('./Task').ITaskModel}
+       */
       findByTags(tags) {
         return this.find({ tags: { $in: tags } }).sort({ priority: -1, end: 1 })
       },
+      /**
+       * @this {import('./Task').ITaskModel}
+       */
       findHighPriorityOverdue() {
         return this.find({
           completed: false,
@@ -221,12 +256,14 @@ const taskSchema = new mongoose.Schema(
         )
       },
       hasAttachmentType(mimeType) {
-        return this.attachments.some((attachment) => attachment.mimeType === mimeType)
+        return this.attachments.some(
+          (attachment) => attachment.mimeType === mimeType,
+        )
       },
       getTimeUntilDeadline() {
         if (!this.end) return null
         const now = new Date()
-        const timeDiff = this.end - now
+        const timeDiff = this.end.getTime() - now.getTime()
         return timeDiff > 0 ? timeDiff : 0
       },
       toggleCompletion() {
@@ -267,7 +304,7 @@ taskSchema.virtual('isUpcoming').get(function () {
 // Virtual for task duration in minutes (if both start and end are set)
 taskSchema.virtual('duration').get(function () {
   if (!this.start || !this.end) return null
-  return Math.round((this.end - this.start) / (1000 * 60))
+  return Math.round((this.end.getTime() - this.start.getTime()) / (1000 * 60))
 })
 
 // Virtual for attachments count
@@ -281,4 +318,5 @@ taskSchema.virtual('priorityLevel').get(function () {
   return levels[this.priority] || 2
 })
 
+/** @type {import('./Task').ITaskModel} */
 export const Task = mongoose.model('Task', taskSchema)
