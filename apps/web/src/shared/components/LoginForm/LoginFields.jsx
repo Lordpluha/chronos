@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import { Field, FieldLabel, FieldError } from "@shared/ui/field";
 import { Input } from "@shared/ui/input";
 import { ROUTES } from "@shared/routes";
-import { PasswordField } from "../common/PasswordField";
 
 export function LoginFields({ register, errors, isLoading, showPassword, setShowPassword }) {
   return (
