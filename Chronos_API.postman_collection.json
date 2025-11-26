@@ -601,6 +601,43 @@
 					"response": []
 				},
 				{
+					"name": "Get Calendar Events (Expanded Recurring)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/calendars/:calendarId/events?startDate=2025-11-01&endDate=2025-11-30&expand_recurring=true",
+							"host": ["{{base_url}}"],
+							"path": ["calendars", ":calendarId", "events"],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "2025-11-01",
+									"description": "Start date for filtering"
+								},
+								{
+									"key": "endDate",
+									"value": "2025-11-30",
+									"description": "End date for filtering"
+								},
+								{
+									"key": "expand_recurring",
+									"value": "true",
+									"description": "Expand recurring events into individual occurrences"
+								}
+							],
+							"variable": [
+								{
+									"key": "calendarId",
+									"value": "{{calendar_id}}"
+								}
+							]
+						},
+						"description": "Получить события календаря с развернутыми рекуррентными событиями в отдельные экземпляры"
+					},
+					"response": []
+				},
+				{
 					"name": "Create Event",
 					"event": [
 						{
@@ -634,6 +671,89 @@
 							"path": ["events"]
 						},
 						"description": "Создать новое событие"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Recurring Event (Daily)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.collectionVariables.set(\"recurring_event_id\", response.event.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"calendar_id\": \"{{calendar_id}}\",\n  \"title\": \"Daily Standup\",\n  \"description\": \"Daily team standup meeting\",\n  \"start\": \"2025-11-25T09:00:00Z\",\n  \"end\": \"2025-11-25T09:15:00Z\",\n  \"location\": {\n    \"name\": \"Virtual - Zoom\",\n    \"url\": \"https://zoom.us/j/123456789\"\n  },\n  \"is_all_day\": false,\n  \"status\": \"confirmed\",\n  \"time_zone\": \"UTC\",\n  \"recurrence\": {\n    \"frequency\": \"daily\",\n    \"interval\": 1,\n    \"count\": 30\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events",
+							"host": ["{{base_url}}"],
+							"path": ["events"]
+						},
+						"description": "Создать рекуррентное событие (ежедневное, 30 раз)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Recurring Event (Weekly)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"calendar_id\": \"{{calendar_id}}\",\n  \"title\": \"Team Planning\",\n  \"description\": \"Weekly planning session every Monday and Wednesday\",\n  \"start\": \"2025-11-25T14:00:00Z\",\n  \"end\": \"2025-11-25T15:00:00Z\",\n  \"is_all_day\": false,\n  \"status\": \"confirmed\",\n  \"time_zone\": \"UTC\",\n  \"recurrence\": {\n    \"frequency\": \"weekly\",\n    \"interval\": 1,\n    \"byWeekday\": [\"MO\", \"WE\"],\n    \"until\": \"2025-12-31T23:59:59Z\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events",
+							"host": ["{{base_url}}"],
+							"path": ["events"]
+						},
+						"description": "Создать рекуррентное событие (еженедельно по понедельникам и средам до конца года)"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Recurring Event (Monthly)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"calendar_id\": \"{{calendar_id}}\",\n  \"title\": \"Monthly Review\",\n  \"description\": \"Monthly performance review meeting\",\n  \"start\": \"2025-11-01T16:00:00Z\",\n  \"end\": \"2025-11-01T17:00:00Z\",\n  \"is_all_day\": false,\n  \"status\": \"confirmed\",\n  \"time_zone\": \"UTC\",\n  \"recurrence\": {\n    \"frequency\": \"monthly\",\n    \"interval\": 1,\n    \"byMonthDay\": [1],\n    \"count\": 12\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/events",
+							"host": ["{{base_url}}"],
+							"path": ["events"]
+						},
+						"description": "Создать рекуррентное событие (ежемесячно 1-го числа, 12 раз)"
 					},
 					"response": []
 				},
@@ -931,6 +1051,64 @@
 							]
 						},
 						"description": "Удалить напоминание"
+					},
+					"response": []
+				},
+				{
+					"name": "Share Reminder",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"colleague@example.com\",\n  \"permission\": \"read\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reminders/:reminderId/share",
+							"host": ["{{base_url}}"],
+							"path": ["reminders", ":reminderId", "share"],
+							"variable": [
+								{
+									"key": "reminderId",
+									"value": "{{reminder_id}}"
+								}
+							]
+						},
+						"description": "Поделиться напоминанием с другим пользователем (permission: read или write)"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Reminder Access",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userEmail\": \"colleague@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reminders/:reminderId/share",
+							"host": ["{{base_url}}"],
+							"path": ["reminders", ":reminderId", "share"],
+							"variable": [
+								{
+									"key": "reminderId",
+									"value": "{{reminder_id}}"
+								}
+							]
+						},
+						"description": "Удалить доступ к напоминанию"
 					},
 					"response": []
 				}

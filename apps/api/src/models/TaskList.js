@@ -82,7 +82,9 @@ const taskListSchema = new mongoose.Schema(
         )
       },
       hasAccess(userId) {
-        return this.creator.toString() === userId.toString()
+        const userIdStr = userId.toString()
+        const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
+        return creatorId === userIdStr
       },
       reorderTasks(taskIds) {
         // Validate that all task IDs belong to this list

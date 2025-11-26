@@ -34,7 +34,7 @@ const accessSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       validate: {
-        validator: function (value) {
+        validator: (value) => {
           // Format: {controls}.{type}.{uuid}
           const pattern =
             /^(calendar|event|reminder|task)\.(create|read|update|delete|share)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
