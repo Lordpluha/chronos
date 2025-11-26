@@ -1,5 +1,8 @@
 import mongoose from 'mongoose'
 
+/**
+ * @type {mongoose.Schema<import('./Reminder').IReminder, import('./Reminder').IReminderModel, import('./Reminder').IReminderMethods>}
+ */
 const reminderSchema = new mongoose.Schema(
   {
     title: {
@@ -43,6 +46,24 @@ const reminderSchema = new mongoose.Schema(
       default: 'UTC',
       trim: true,
     },
+    shared_with: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          index: true,
+        },
+        permission: {
+          type: String,
+          enum: ['read', 'write'],
+          default: 'read',
+        },
+        shared_at: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: {
@@ -62,6 +83,11 @@ const reminderSchema = new mongoose.Schema(
       [{ organizer: 1, start: 1 }],
     ],
     statics: {
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} calendarId
+       * @param {{ startDate?: Date; endDate?: Date }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByCalendar(calendarId, options = {}) {
         const query = this.find({ calendar: calendarId })
 
@@ -74,16 +100,28 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} creatorId
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByCreator(creatorId) {
         return this.find({ creator: creatorId }).populate(
           'creator organizer calendar',
         )
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} organizerId
+       * @this {import('./Reminder').IReminderModel}
+       */
       findByOrganizer(organizerId) {
         return this.find({ organizer: organizerId }).populate(
           'creator organizer calendar',
         )
       },
+      /**
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string; userId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findOverdue(options = {}) {
         const query = this.find({ start: { $lt: new Date() } })
 
@@ -99,6 +137,11 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {number} [hours]
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string; userId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findUpcoming(hours = 24, options = {}) {
         const now = new Date()
         const future = new Date(now.getTime() + hours * 60 * 60 * 1000)
@@ -119,6 +162,12 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar').sort({ start: 1 })
       },
+      /**
+       * @param {Date} startDate
+       * @param {Date} endDate
+       * @param {{ calendarId?: import('mongoose').Types.ObjectId | string }} [options]
+       * @this {import('./Reminder').IReminderModel}
+       */
       findInDateRange(startDate, endDate, options = {}) {
         const query = this.find({
           start: { $gte: startDate, $lte: endDate },
@@ -130,22 +179,92 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {import('./Reminder').IReminderModel}
+       */
+      findAccessibleByUser(userId) {
+        return this.find({
+          $or: [
+            { creator: userId },
+            { organizer: userId },
+            { 'shared_with.user': userId },
+          ],
+        }).populate('creator organizer calendar')
+      },
     },
     methods: {
-      hasAccess(userId) {
-        return (
-          this.creator.toString() === userId.toString() ||
-          this.organizer.toString() === userId.toString()
-        )
+      hasAccess(userId, requiredPermission = 'read') {
+        const userIdStr = userId.toString()
+
+        // Безопасное получение ID создателя и организатора
+        const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
+        const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
+
+        // Создатель и организатор имеют полный доступ
+        if (creatorId === userIdStr || organizerId === userIdStr) {
+          return true
+        }
+
+        // Проверяем shared_with
+        const sharedAccess = this.shared_with.find((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId === userIdStr
+        })
+
+        if (!sharedAccess) return false
+
+        // Проверяем уровень доступа
+        if (requiredPermission === 'write') {
+          return sharedAccess.permission === 'write'
+        }
+
+        return true // read доступ есть
+      },
+      shareWith(userId, permission = 'read') {
+        const userIdStr = userId.toString()
+        const existingShare = this.shared_with.find((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId === userIdStr
+        })
+
+        if (existingShare) {
+          existingShare.permission = permission
+          existingShare.shared_at = new Date()
+        } else {
+          this.shared_with.push({
+            user: /** @type {import('mongoose').Types.ObjectId} */ (userId),
+            permission: permission,
+            shared_at: new Date(),
+          })
+        }
+      },
+      removeSharedAccess(userId) {
+        const userIdStr = userId.toString()
+        this.shared_with = this.shared_with.filter((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId !== userIdStr
+        })
       },
       shouldTrigger(minutesBefore = 0) {
         const now = new Date()
-        const triggerTime = new Date(this.start.getTime() - minutesBefore * 60 * 1000)
+        const triggerTime = new Date(
+          this.start.getTime() - minutesBefore * 60 * 1000,
+        )
         return now >= triggerTime && now <= this.start
       },
       getTimeUntil() {
         const now = new Date()
-        const timeDiff = this.start - now
+        const timeDiff = this.start.getTime() - now.getTime()
         return timeDiff > 0 ? timeDiff : 0
       },
     },
@@ -169,4 +288,5 @@ reminderSchema.virtual('isUpcoming').get(function () {
   return this.start > now && this.start <= tomorrow
 })
 
+/** @type {import('./Reminder').IReminderModel} */
 export const Reminder = mongoose.model('Reminder', reminderSchema)

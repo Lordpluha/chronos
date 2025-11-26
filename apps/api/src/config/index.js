@@ -16,7 +16,9 @@ class AppConfigClass {
 
   constructor() {
     /** @type {Environment} */
-    this.env = /** @type {Environment} */ (process.env.NODE_ENV || 'development')
+    this.env = /** @type {Environment} */ (
+      process.env.NODE_ENV || 'development'
+    )
     this.isProduction = this.env === 'production'
     this.isDevelopment = this.env === 'development'
     this.isTest = this.env === 'test'
@@ -46,11 +48,7 @@ class AppConfigClass {
     return result.config
   }
 
-  // =============================================================================
-  // СЕКЦИЯ: ПРИЛОЖЕНИЕ
-  // =============================================================================
-
-  get PORT () {
+  get PORT() {
     return this.#config.app.BACK_PORT
   }
 
@@ -76,10 +74,6 @@ class AppConfigClass {
     return `${protocol}://${this.HOST}:${this.PORT}`
   }
 
-  // =============================================================================
-  // СЕКЦИЯ: БАЗА ДАННЫХ
-  // =============================================================================
-
   get MONGO_URI() {
     return this.#config.database.MONGODB_URI
   }
@@ -102,10 +96,6 @@ class AppConfigClass {
     }
   }
 
-  // =============================================================================
-  // СЕКЦИЯ: JWT И АУТЕНТИФИКАЦИЯ
-  // =============================================================================
-
   get JWT_SECRET() {
     return this.#config.jwt.JWT_SECRET
   }
@@ -125,10 +115,6 @@ class AppConfigClass {
   get REFRESH_TOKEN_NAME() {
     return this.#config.jwt.REFRESH_TOKEN_NAME
   }
-
-  // =============================================================================
-  // СЕКЦИЯ: EMAIL
-  // =============================================================================
 
   get SMTP_HOST() {
     return this.#config.email.SMTP_HOST
@@ -150,10 +136,6 @@ class AppConfigClass {
     return this.#config.email.CODE_LIFETIME
   }
 
-  // =============================================================================
-  // СЕКЦИЯ: OAUTH
-  // =============================================================================
-
   get OAUTH_CLIENT_ID() {
     return this.#config.oauth.OAUTH_CLIENT_ID
   }
@@ -165,10 +147,6 @@ class AppConfigClass {
   get GOOGLE_CALLBACK_URL() {
     return this.#config.oauth.GOOGLE_CALLBACK_URL
   }
-
-  // =============================================================================
-  // СЕРВИСЫ И ФАБРИКИ
-  // =============================================================================
 
   /**
    * Получает настроенный email транспорт (lazy initialization)
@@ -187,7 +165,7 @@ class AppConfigClass {
     return this.#emailTransporter
   }
 
-  get emailFrom() {
+  get EMAIL_FROM() {
     return '"Chronos" <support@chronos.com>'
   }
 
@@ -207,17 +185,13 @@ class AppConfigClass {
    */
   getCookieOptions(type) {
     return {
-      httpOnly: type !== 'access',
+      httpOnly: true,
       secure: this.env === 'production',
       sameSite: 'lax',
       maxAge:
         type === 'access' ? this.cookieAccessMaxAge : this.cookieRefreshMaxAge,
     }
   }
-
-  // =============================================================================
-  // СЕКЦИЯ: RATE LIMITING
-  // =============================================================================
 
   /**
    * Конфигурации Rate Limiting
@@ -404,10 +378,6 @@ class AppConfigClass {
 
     next()
   }
-
-  // =============================================================================
-  // УТИЛИТНЫЕ МЕТОДЫ И ВАЛИДАЦИЯ
-  // =============================================================================
 
   /**
    * Валидирует обязательные переменные окружения

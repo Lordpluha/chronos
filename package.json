@@ -21,7 +21,9 @@
     "docker:web" : "docker compose --env-file ./apps/api/.env.local --profile development up web --build -d",
     "docker:stop": "docker compose down"
   },
-  "dependencies": {},
+  "dependencies": {
+    "dayjs": "^1.11.19"
+  },
   "devDependencies": {
     "turbo": "^2.6.0"
   },

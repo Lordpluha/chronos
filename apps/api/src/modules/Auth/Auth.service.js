@@ -9,6 +9,7 @@ import {
   INVALID_OR_EXPIRED_CODE,
   INVALID_USERNAME_OR_PASSWORD,
   REFRESH_TOKEN_MISSING,
+	USER_ALREADY_EXISTS,
 } from '../../messages/index.js'
 import {
   DateTimeUtils,
@@ -26,8 +27,7 @@ class AuthService {
     })
 
     if (existingUser) {
-      const err = new Error('User already exists')
-      err.status = 409
+      const err = new Error(USER_ALREADY_EXISTS)
       throw err
     }
 
@@ -36,20 +36,27 @@ class AuthService {
       login: login,
       email: email,
       password_hash: password, // Will be hashed by the pre-save hook
-      full_name: full_name
+      full_name: full_name,
     })
 
     await user.save()
     return
   }
 
-  async login({ login, password, token }) {
+  /**
+   * @param {Object} param0
+   * @param {string} param0.login
+   * @param {string} param0.password
+   * @param {string} param0.token
+   * @param {string|undefined} ipAddress
+   * @param {Object|undefined} deviceInfo
+   */
+  async login({ login, password, token }, ipAddress, deviceInfo) {
     // Find user by username or email
     const user = await User.findByEmailOrUsername(login)
 
     if (!user) {
       const err = new Error(INVALID_USERNAME_OR_PASSWORD)
-      err.status = 401
       throw err
     }
 
@@ -57,7 +64,6 @@ class AuthService {
     const isPasswordValid = await user.checkPassword(password)
     if (!isPasswordValid) {
       const err = new Error(INVALID_USERNAME_OR_PASSWORD)
-      err.status = 401
       throw err
     }
 
@@ -65,7 +71,6 @@ class AuthService {
     if (user.twoFactorEnabled) {
       if (!token) {
         const err = new Error('2FA token required')
-        err.status = 422
         err.requires2FA = true
         throw err
       }
@@ -73,7 +78,6 @@ class AuthService {
       const isValidToken = await this.verify2FAToken(user._id, token)
       if (!isValidToken) {
         const err = new Error('Invalid 2FA token')
-        err.status = 401
         throw err
       }
     }
@@ -86,11 +90,13 @@ class AuthService {
     const access_token = JWTUtils.generateAccessToken(user._id, user.login)
     const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
-    // Create session
+    // Create session with IP address and device info
     const session = new Session({
       user: user._id,
       access_token: access_token,
       refresh_token: refresh_token,
+      ip_address: ipAddress,
+      device: deviceInfo,
     })
 
     await session.save()
@@ -106,7 +112,6 @@ class AuthService {
   async refresh(old_refresh_token) {
     if (!old_refresh_token) {
       const err = new Error(REFRESH_TOKEN_MISSING)
-      err.status = 401
       throw err
     }
 
@@ -114,7 +119,6 @@ class AuthService {
     const session = await Session.findOne({ refresh_token: old_refresh_token })
     if (!session) {
       const err = new Error('Invalid refresh token')
-      err.status = 401
       throw err
     }
 
@@ -155,7 +159,6 @@ class AuthService {
     const user = await User.findOne({ email: body.email })
     if (!user) {
       const err = new Error('User with this email not found')
-      err.status = 404
       throw err
     }
 
@@ -203,14 +206,12 @@ class AuthService {
 
     if (!resetRecord) {
       const err = new Error(INVALID_OR_EXPIRED_CODE)
-      err.status = 400
       throw err
     }
 
     const user = resetRecord.user
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 
@@ -225,9 +226,11 @@ class AuthService {
   /**
    * Поиск или создание пользователя через Google OAuth
    * @param {Object} googleUser - Данные пользователя от Google
+   * @param {string} ipAddress - IP адрес пользователя
+   * @param {Object} deviceInfo - Информация о устройстве
    * @returns {Promise<Object>} Токены доступа
    */
-  async loginOrCreateGoogleUser(googleUser) {
+  async loginOrCreateGoogleUser(googleUser, ipAddress = null, deviceInfo = null) {
     const { googleId, email, name, given_name, family_name, picture } =
       googleUser
 
@@ -279,11 +282,13 @@ class AuthService {
     const access_token = JWTUtils.generateAccessToken(user._id, user.login)
     const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
 
-    // Create session
+    // Create session with IP address and device info
     const session = new Session({
       user: user._id,
       access_token: access_token,
       refresh_token: refresh_token,
+      ip_address: ipAddress,
+      device: deviceInfo,
     })
 
     await session.save()
@@ -304,9 +309,11 @@ class AuthService {
    * Обрабатывает callback от Google OAuth
    * @param {string} code - Код авторизации
    * @param {string} _state - State параметр для проверки CSRF (не используется)
+   * @param {string} ipAddress - IP адрес пользователя
+   * @param {Object} deviceInfo - Информация о устройстве
    * @returns {Promise<Object>} Токены доступа
    */
-  async handleGoogleCallback(code, _state = null) {
+  async handleGoogleCallback(code, _state = null, ipAddress = null, deviceInfo = null) {
     try {
       // Получаем токены от Google
       const tokens = await googleAuthService.getTokens(code)
@@ -324,12 +331,10 @@ class AuthService {
       }
 
       // Создаем или находим пользователя
-      return await this.loginOrCreateGoogleUser(googleUser)
+      return await this.loginOrCreateGoogleUser(googleUser, ipAddress, deviceInfo)
     } catch (error) {
       console.error('Google OAuth error:', error)
-      const err = new Error('Google authentication failed')
-      err.status = 400
-      throw err
+      throw error
     }
   }
 
@@ -354,14 +359,12 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 
     const isPasswordValid = await user.checkPassword(password)
     if (!isPasswordValid) {
       const err = new Error('Invalid password')
-      err.status = 401
       throw err
     }
 
@@ -404,14 +407,12 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 
     const isPasswordValid = await user.checkPassword(password)
     if (!isPasswordValid) {
       const err = new Error('Invalid password')
-      err.status = 401
       throw err
     }
 
@@ -419,7 +420,6 @@ class AuthService {
     const totpRecord = await RegistrationTotp.findOne({ userId })
     if (!totpRecord) {
       const err = new Error('2FA not set up. Please run setup first.')
-      err.status = 400
       throw err
     }
 
@@ -433,7 +433,6 @@ class AuthService {
 
     if (!verified) {
       const err = new Error('Invalid 2FA token')
-      err.status = 401
       throw err
     }
 
@@ -463,14 +462,12 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 
     const isPasswordValid = await user.checkPassword(password)
     if (!isPasswordValid) {
       const err = new Error('Invalid password')
-      err.status = 401
       throw err
     }
 
@@ -548,7 +545,6 @@ class AuthService {
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
-      err.status = 404
       throw err
     }
 

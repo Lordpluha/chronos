@@ -1,7 +1,10 @@
-import mongoose from 'mongoose'
+import mongoose, { Schema, model } from 'mongoose'
 import argon2 from 'argon2'
 
-const userSchema = new mongoose.Schema(
+/**
+ * @type {mongoose.Schema<import('./User').IUser, import('./User').IUserModel, import('./User').IUserMethods>}
+ */
+const UserSchema = new Schema(
   {
     login: {
       type: String,
@@ -12,20 +15,20 @@ const userSchema = new mongoose.Schema(
       maxlength: 30,
       validate: {
         validator: (value) => /^[a-zA-Z0-9_-]+$/.test(value),
-        message: 'Login can only contain alphanumeric characters, underscores, and hyphens',
+        message:
+          'Login can only contain alphanumeric characters, underscores, and hyphens',
       },
     },
     email: {
       type: String,
-      required: function () {
-        return !this.google_id
-      },
+      required: true,
       unique: true,
       sparse: true,
       trim: true,
       lowercase: true,
       validate: {
-        validator: (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        validator: (value) =>
+          !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
         message: 'Invalid email format',
       },
     },
@@ -37,10 +40,7 @@ const userSchema = new mongoose.Schema(
     },
     password_hash: {
       type: String,
-      required: function () {
-        // Password is required only if google_id is not present
-        return !this.google_id
-      },
+      required: false,
       minlength: 6,
     },
     is_email_verified: {
@@ -86,29 +86,35 @@ const userSchema = new mongoose.Schema(
       createdAt: 'created',
       updatedAt: 'updated',
     },
-    toJSON: {
-      transform: (_doc, ret) => {
-        delete ret.password_hash
-        return ret
-      },
-    },
     statics: {
+      /**
+       * @param {string} login
+       * @this {import('./User').IUserModel}
+       */
       findByLogin(login) {
         return this.findOne({ login: login })
       },
+      /**
+       * @param {string} email
+       * @this {import('./User').IUserModel}
+       */
       findByEmail(email) {
         return this.findOne({ email: email.toLowerCase() })
       },
+      /**
+       * @param {string} loginOrEmail
+       * @this {import('./User').IUserModel}
+       */
       findByEmailOrUsername(loginOrEmail) {
         return this.findOne({
-          $or: [
-            { login: loginOrEmail },
-            { email: loginOrEmail.toLowerCase() }
-          ]
+          $or: [{ login: loginOrEmail }, { email: loginOrEmail.toLowerCase() }],
         })
       },
     },
     methods: {
+      /**
+       * @param {string} candidatePassword
+       */
       async checkPassword(candidatePassword) {
         try {
           return await argon2.verify(this.password_hash, candidatePassword)
@@ -116,21 +122,33 @@ const userSchema = new mongoose.Schema(
           return false
         }
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId} calendarId
+       */
       addCalendar(calendarId) {
         if (!this.calendars.includes(calendarId)) {
           this.calendars.push(calendarId)
         }
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId} calendarId
+       */
       removeCalendar(calendarId) {
         this.calendars = this.calendars.filter(
           (calendar) => calendar.toString() !== calendarId.toString(),
         )
       },
+      /**
+       * "@param {import('mongoose').Types.ObjectId} taskListId
+       */
       addTaskList(taskListId) {
         if (!this.task_lists.includes(taskListId)) {
           this.task_lists.push(taskListId)
         }
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId} taskListId
+       */
       removeTaskList(taskListId) {
         this.task_lists = this.task_lists.filter(
           (list) => list.toString() !== taskListId.toString(),
@@ -145,7 +163,7 @@ const userSchema = new mongoose.Schema(
  * @param {Function} next - Next middleware function
  * @returns {Promise<void>}
  */
-userSchema.pre('save', async function (next) {
+UserSchema.pre('save', async function (next) {
   if (!this.isModified('password_hash')) return next()
 
   try {
@@ -156,4 +174,5 @@ userSchema.pre('save', async function (next) {
   }
 })
 
-export const User = mongoose.model('User', userSchema)
+/** @type {import('./User').IUserModel} */
+export const User = model('User', UserSchema)

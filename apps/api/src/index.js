@@ -13,14 +13,20 @@ app.disable('x-powered-by')
 app.use(express.static('public'))
 
 // Middleware
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || origin.startsWith(`http://${AppConfig.FRONT_HOST}:${AppConfig.FRONT_PORT}`) || origin.startsWith(`http://${AppConfig.HOST}:${AppConfig.PORT}`))
-      return cb(null, true)
-    return cb(new Error('Not allowed by CORS'))
-  },
-  credentials: true
-}))
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (
+        !origin ||
+        origin.startsWith(AppConfig.FRONT_URL) ||
+        origin.startsWith(AppConfig.BACK_URL)
+      )
+        return cb(null, true)
+      return cb(new Error('Not allowed by CORS'))
+    },
+    credentials: true,
+  }),
+)
 
 // @ts-expect-error
 app.use(cookieParser(AppConfig.JWT_SECRET))
@@ -31,15 +37,6 @@ app.use(express.urlencoded({ extended: true }))
 
 app.get('/api', (_req, res) => {
   res.send('Welcome to chronos api!')
-})
-
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    database: 'MongoDB',
-    version: '1.0.0',
-  })
 })
 
 // Routes

@@ -10,13 +10,19 @@ import {
   requireAccessToken,
   requireRefreshToken,
 } from '../../middleware/index.js'
-import { JWTUtils, validateBody, validateParams } from '../../utils/index.js'
+import {
+  DeviceUtils,
+  JWTUtils,
+  validateBody,
+  validateParams,
+} from '../../utils/index.js'
 import { UsedOAuthCode } from '../../models/UsedOAuthCode.js'
 
 import { authService } from './Auth.service.js'
 import {
   disable2FASchema,
   enable2FASchema,
+  loginSchema,
   loginWith2FASchema,
   passwordResetRequestSchema,
   passwordResetSchema,
@@ -44,24 +50,25 @@ router.post(
 
 router.post(
   '/auth/login',
-  validateBody(loginWith2FASchema),
+  validateBody(loginSchema),
   async (req, res) => {
-    try {
-      const { access_token, refresh_token } = await authService.login(req.body)
-      res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
-      return res.json({ message: USER_LOGGED_IN })
-    } catch (err) {
-      res = JWTUtils.clearHttpOnlyCookie(res)
+    const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
 
-      // Если требуется 2FA, возвращаем специальный статус
-      if (err.requires2FA) {
-        return res.status(422).json({
-          message: err.message,
+    try {
+      const { access_token, refresh_token } = await authService.login(req.body, ipAddress, deviceInfo)
+      res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
+      res.status(200).json({
+        message: USER_LOGGED_IN
+      })
+    } catch (error) {
+      if (error.requires2FA) {
+        return res.status(200).json({
           requires2FA: true,
+          message: error.message,
         })
       }
-
-      return res.status(err.status || 400).json({ message: err.message })
+      const statusCode = error.status || 400
+      res.status(statusCode).json({ error: error.message })
     }
   },
 )
@@ -187,8 +194,10 @@ router.get('/auth/google/callback', async (req, res) => {
     console.log('🔄 Processing Google OAuth callback...')
 
     // Обрабатываем callback и получаем токены
+    const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
+
     const { access_token, refresh_token } =
-      await authService.handleGoogleCallback(code, state)
+      await authService.handleGoogleCallback(code, state, ipAddress, deviceInfo)
 
     // Устанавливаем токены в cookies
     res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
@@ -201,9 +210,9 @@ router.get('/auth/google/callback', async (req, res) => {
 
     console.log(
       '✅ Google OAuth successful, redirecting to:',
-      `${frontendUrl}/profile`,
+      `${frontendUrl}/calendar`,
     )
-    return res.redirect(`${frontendUrl}/profile`)
+    return res.redirect(`${frontendUrl}/calendar`)
   } catch (err) {
     console.error('❌ Google OAuth callback error:', err)
 
