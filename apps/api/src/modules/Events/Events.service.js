@@ -3,7 +3,7 @@ import { Calendar } from '../../models/Calendar.js'
 
 class EventsService {
   /**
-   * Создать новое событие
+   * Создать новое событие (включая рекуррентные)
    */
   async createEvent(userId, data) {
     const {
@@ -17,6 +17,7 @@ class EventsService {
       is_all_day,
       status,
       attendees,
+      recurrence,
     } = data
 
     // Проверяем доступ к календарю
@@ -46,6 +47,8 @@ class EventsService {
       is_all_day: is_all_day || false,
       status: status || 'confirmed',
       attendees: attendees || [],
+      recurrence: recurrence || null,
+      is_recurring: !!recurrence,
     })
 
     await event.save()
@@ -58,7 +61,7 @@ class EventsService {
   }
 
   /**
-   * Получить события календаря
+   * Получить события календаря (включая экземпляры рекуррентных событий)
    */
   async getCalendarEvents(calendarId, userId, query = {}) {
     const calendar = await Calendar.findById(calendarId)
@@ -74,9 +77,25 @@ class EventsService {
       throw error
     }
 
-    const { startDate, endDate, status } = query
-    const options = {}
+    const { startDate, endDate, status, expand_recurring } = query
 
+    if (startDate && endDate && expand_recurring === 'true') {
+      // Используем метод для расширения рекуррентных событий
+      let events = await Event.findWithRecurrence(
+        calendarId,
+        new Date(startDate),
+        new Date(endDate)
+      )
+
+      if (status) {
+        events = events.filter((event) => event.status === status)
+      }
+
+      return events
+    }
+
+    // Обычный запрос без расширения рекуррентных событий
+    const options = {}
     if (startDate) options.startDate = new Date(startDate)
     if (endDate) options.endDate = new Date(endDate)
 
@@ -172,9 +191,70 @@ class EventsService {
     if (data.location !== undefined) event.location = data.location
     if (data.is_all_day !== undefined) event.is_all_day = data.is_all_day
     if (data.status !== undefined) event.status = data.status
+    if (data.recurrence !== undefined) {
+      event.recurrence = data.recurrence
+      event.is_recurring = !!data.recurrence
+    }
 
     await event.save()
     return event
+  }
+
+  /**
+   * Удалить рекуррентное событие
+   * @param {string} eventId - ID события
+   * @param {string} userId - ID пользователя
+   * @param {Object} options - Опции удаления
+   * @param {boolean} options.delete_all - Удалить все экземпляры (по умолчанию true для мастер-события)
+   * @param {Date} options.occurrence_date - Дата конкретного экземпляра для создания исключения
+   */
+  async deleteRecurringEvent(eventId, userId, options = {}) {
+    const event = await Event.findById(eventId).populate('calendar')
+
+    if (!event) {
+      const error = new Error('Event not found')
+      error.status = 404
+      throw error
+    }
+
+    // Проверяем права
+    if (event.calendar && typeof event.calendar !== 'string') {
+      if (!event.calendar.hasAccess(userId, 'write') && event.organizer.toString() !== userId) {
+        const error = new Error('Access denied')
+        error.status = 403
+        throw error
+      }
+    }
+
+    // Если это мастер-событие и нужно удалить все экземпляры
+    if (event.isMasterEvent() && (options.delete_all === undefined || options.delete_all === true)) {
+      // Удаляем все экземпляры
+      await Event.deleteMany({ recurrence_id: event._id })
+
+      // Удаляем мастер-событие
+      if (event.calendar && typeof event.calendar !== 'string') {
+        event.calendar.removeEvent(event._id)
+        await event.calendar.save()
+      }
+
+      await event.deleteOne()
+      return { message: 'All recurring events deleted successfully' }
+    }
+
+    // Если это экземпляр рекуррентного события
+    if (event.isRecurrenceInstance()) {
+      await event.deleteOne()
+      return { message: 'Event occurrence deleted successfully' }
+    }
+
+    // Обычное удаление одного события
+    if (event.calendar && typeof event.calendar !== 'string') {
+      event.calendar.removeEvent(event._id)
+      await event.calendar.save()
+    }
+
+    await event.deleteOne()
+    return { message: 'Event deleted successfully' }
   }
 
   /**

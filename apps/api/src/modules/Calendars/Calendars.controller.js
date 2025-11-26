@@ -15,6 +15,8 @@ import {
   updateAttendeeStatusSchema,
   createReminderSchema,
   updateReminderSchema,
+  shareReminderSchema,
+  removeReminderAccessSchema,
 } from './Calendars.validation.js'
 
 const router = express.Router()
@@ -401,5 +403,51 @@ router.delete('/reminders/:reminderId', requireAccessToken, async (req, res) => 
     return res.status(err.status || 500).json({ message: err.message })
   }
 })
+
+// POST /reminders/:reminderId/share - поделиться напоминанием
+router.post(
+  '/reminders/:reminderId/share',
+  requireAccessToken,
+  validateBody(shareReminderSchema),
+  async (req, res) => {
+    try {
+      const reminder = await remindersService.shareReminder(
+        req.params.reminderId,
+        req.userId,
+        req.body,
+      )
+      return res.json({
+        message: 'Reminder shared successfully',
+        reminder,
+      })
+    } catch (err) {
+      console.error('❌ Error sharing reminder:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// DELETE /reminders/:reminderId/share - удалить доступ к напоминанию
+router.delete(
+  '/reminders/:reminderId/share',
+  requireAccessToken,
+  validateBody(removeReminderAccessSchema),
+  async (req, res) => {
+    try {
+      const reminder = await remindersService.removeReminderAccess(
+        req.params.reminderId,
+        req.userId,
+        req.body.userEmail,
+      )
+      return res.json({
+        message: 'Reminder access removed successfully',
+        reminder,
+      })
+    } catch (err) {
+      console.error('❌ Error removing reminder access:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
 
 export { router as CalendarsRouter }

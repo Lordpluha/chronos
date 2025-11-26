@@ -29,6 +29,34 @@ export const removeAccessSchema = z.object({
 })
 
 // Валидация для событий
+export const recurrenceSchema = z.object({
+  frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+  interval: z.number().int().min(1).max(999).default(1),
+  byWeekday: z.array(z.enum(['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'])).optional(),
+  byMonthDay: z.array(z.number().int().min(-31).max(31).refine(val => val !== 0)).optional(),
+  byMonth: z.array(z.number().int().min(1).max(12)).optional(),
+  count: z.number().int().min(1).max(999).optional(),
+  until: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
+}).refine((data) => {
+  // Either count or until must be specified, but not both
+  if (data.count && data.until) return false
+  return true
+}, {
+  message: 'Specify either count or until, not both',
+}).refine((data) => {
+  // byWeekday is only valid for weekly frequency
+  if (data.byWeekday && data.frequency !== 'weekly') return false
+  return true
+}, {
+  message: 'byWeekday can only be used with weekly frequency',
+}).refine((data) => {
+  // byMonthDay is only valid for monthly/yearly frequency
+  if (data.byMonthDay && !['monthly', 'yearly'].includes(data.frequency)) return false
+  return true
+}, {
+  message: 'byMonthDay can only be used with monthly or yearly frequency',
+})
+
 export const createEventSchema = z.object({
   title: z.string().trim().min(1).max(300, 'Title must not exceed 300 characters'),
   description: z.string().trim().max(2000, 'Description must not exceed 2000 characters').optional().nullable(),
@@ -52,6 +80,7 @@ export const createEventSchema = z.object({
     email: z.string().email().optional(),
     status: z.enum(['invited', 'accepted', 'declined', 'maybe']).default('invited'),
   })).optional(),
+  recurrence: recurrenceSchema.optional().nullable(),
 }).refine((data) => new Date(data.end) > new Date(data.start), {
   message: 'End date must be after start date',
   path: ['end'],
@@ -74,6 +103,7 @@ export const updateEventSchema = z.object({
   }).optional().nullable(),
   is_all_day: z.boolean().optional(),
   status: z.enum(['confirmed', 'tentative', 'cancelled']).optional(),
+  recurrence: recurrenceSchema.optional().nullable(),
 })
 
 export const addAttendeeSchema = z.object({
@@ -103,3 +133,13 @@ export const updateReminderSchema = z.object({
   time_zone: z.string().trim().optional(),
   start: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
 })
+
+export const shareReminderSchema = z.object({
+  userEmail: z.string().email('Invalid email format'),
+  permission: z.enum(['read', 'write']).default('read'),
+})
+
+export const removeReminderAccessSchema = z.object({
+  userEmail: z.string().email('Invalid email format'),
+})
+

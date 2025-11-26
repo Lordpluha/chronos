@@ -46,6 +46,24 @@ const reminderSchema = new mongoose.Schema(
       default: 'UTC',
       trim: true,
     },
+    shared_with: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          index: true,
+        },
+        permission: {
+          type: String,
+          enum: ['read', 'write'],
+          default: 'read',
+        },
+        shared_at: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: {
@@ -161,16 +179,81 @@ const reminderSchema = new mongoose.Schema(
 
         return query.populate('creator organizer calendar')
       },
+      /**
+       * @param {import('mongoose').Types.ObjectId | string} userId
+       * @this {import('./Reminder').IReminderModel}
+       */
+      findAccessibleByUser(userId) {
+        return this.find({
+          $or: [
+            { creator: userId },
+            { organizer: userId },
+            { 'shared_with.user': userId },
+          ],
+        }).populate('creator organizer calendar')
+      },
     },
     methods: {
-      hasAccess(userId) {
+      hasAccess(userId, requiredPermission = 'read') {
         const userIdStr = userId.toString()
-        
+
         // Безопасное получение ID создателя и организатора
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
         const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
-        
-        return creatorId === userIdStr || organizerId === userIdStr
+
+        // Создатель и организатор имеют полный доступ
+        if (creatorId === userIdStr || organizerId === userIdStr) {
+          return true
+        }
+
+        // Проверяем shared_with
+        const sharedAccess = this.shared_with.find((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId === userIdStr
+        })
+
+        if (!sharedAccess) return false
+
+        // Проверяем уровень доступа
+        if (requiredPermission === 'write') {
+          return sharedAccess.permission === 'write'
+        }
+
+        return true // read доступ есть
+      },
+      shareWith(userId, permission = 'read') {
+        const userIdStr = userId.toString()
+        const existingShare = this.shared_with.find((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId === userIdStr
+        })
+
+        if (existingShare) {
+          existingShare.permission = permission
+          existingShare.shared_at = new Date()
+        } else {
+          this.shared_with.push({
+            user: /** @type {import('mongoose').Types.ObjectId} */ (userId),
+            permission: permission,
+            shared_at: new Date(),
+          })
+        }
+      },
+      removeSharedAccess(userId) {
+        const userIdStr = userId.toString()
+        this.shared_with = this.shared_with.filter((share) => {
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
+          return shareUserId !== userIdStr
+        })
       },
       shouldTrigger(minutesBefore = 0) {
         const now = new Date()

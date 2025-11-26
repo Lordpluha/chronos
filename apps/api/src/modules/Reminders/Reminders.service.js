@@ -83,13 +83,17 @@ class RemindersService {
       reminders = await Reminder.findOverdue({ userId })
     } else if (startDate && endDate) {
       reminders = await Reminder.findInDateRange(new Date(startDate), new Date(endDate))
-      // Фильтруем по пользователю
-      reminders = reminders.filter(
-        (r) =>
-          r.creator.toString() === userId || r.organizer.toString() === userId,
-      )
+      // Фильтруем по пользователю (включая shared)
+      reminders = reminders.filter((r) => r.hasAccess(userId))
     } else {
-      reminders = await Reminder.findByCreator(userId)
+      // Получаем напоминания где пользователь - создатель, организатор или имеет shared доступ
+      reminders = await Reminder.find({
+        $or: [
+          { creator: userId },
+          { organizer: userId },
+          { 'shared_with.user': userId },
+        ],
+      }).populate('creator organizer calendar')
     }
 
     return reminders
@@ -129,9 +133,9 @@ class RemindersService {
       throw error
     }
 
-    // Проверяем доступ
-    if (!reminder.hasAccess(userId)) {
-      const error = new Error('Access denied')
+    // Проверяем доступ на запись
+    if (!reminder.hasAccess(userId, 'write')) {
+      const error = new Error('Access denied: write permission required')
       error.status = 403
       throw error
     }
@@ -158,9 +162,12 @@ class RemindersService {
       throw error
     }
 
-    // Проверяем доступ
-    if (!reminder.hasAccess(userId)) {
-      const error = new Error('Access denied')
+    // Только создатель или организатор может удалить
+    const creatorId = reminder.creator?._id ? reminder.creator._id.toString() : reminder.creator.toString()
+    const organizerId = reminder.organizer?._id ? reminder.organizer._id.toString() : reminder.organizer.toString()
+
+    if (creatorId !== userId.toString() && organizerId !== userId.toString()) {
+      const error = new Error('Only creator or organizer can delete reminder')
       error.status = 403
       throw error
     }
@@ -173,6 +180,88 @@ class RemindersService {
 
     await reminder.deleteOne()
     return { message: 'Reminder deleted successfully' }
+  }
+
+  /**
+   * Поделиться напоминанием с пользователем
+   */
+  async shareReminder(reminderId, userId, shareData) {
+    const { userEmail, permission } = shareData
+
+    const reminder = await Reminder.findById(reminderId)
+
+    if (!reminder) {
+      const error = new Error('Reminder not found')
+      error.status = 404
+      throw error
+    }
+
+    // Только создатель или организатор может делиться
+    const creatorId = reminder.creator?._id ? reminder.creator._id.toString() : reminder.creator.toString()
+    const organizerId = reminder.organizer?._id ? reminder.organizer._id.toString() : reminder.organizer.toString()
+
+    if (creatorId !== userId.toString() && organizerId !== userId.toString()) {
+      const error = new Error('Only creator or organizer can share reminder')
+      error.status = 403
+      throw error
+    }
+
+    // Находим пользователя по email
+    const User = (await import('../../models/User.js')).User
+    const targetUser = await User.findByEmail(userEmail)
+    if (!targetUser) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    // Нельзя делиться с самим собой
+    if (targetUser._id.toString() === userId.toString()) {
+      const error = new Error('Cannot share reminder with yourself')
+      error.status = 400
+      throw error
+    }
+
+    reminder.shareWith(targetUser._id, permission)
+    await reminder.save()
+
+    return reminder
+  }
+
+  /**
+   * Удалить доступ к напоминанию
+   */
+  async removeReminderAccess(reminderId, userId, targetUserEmail) {
+    const reminder = await Reminder.findById(reminderId)
+
+    if (!reminder) {
+      const error = new Error('Reminder not found')
+      error.status = 404
+      throw error
+    }
+
+    // Только создатель или организатор может удалять доступ
+    const creatorId = reminder.creator?._id ? reminder.creator._id.toString() : reminder.creator.toString()
+    const organizerId = reminder.organizer?._id ? reminder.organizer._id.toString() : reminder.organizer.toString()
+
+    if (creatorId !== userId.toString() && organizerId !== userId.toString()) {
+      const error = new Error('Only creator or organizer can remove access')
+      error.status = 403
+      throw error
+    }
+
+    const User = (await import('../../models/User.js')).User
+    const targetUser = await User.findByEmail(targetUserEmail)
+    if (!targetUser) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    reminder.removeSharedAccess(targetUser._id)
+    await reminder.save()
+
+    return reminder
   }
 }
 

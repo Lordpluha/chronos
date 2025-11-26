@@ -1,5 +1,11 @@
 import type { Model, Types, HydratedDocument } from 'mongoose'
 
+export interface ISharedWith {
+  user: Types.ObjectId
+  permission: 'read' | 'write'
+  shared_at: Date
+}
+
 export interface IReminder {
   title: string
   description: string | null
@@ -8,6 +14,7 @@ export interface IReminder {
   calendar: Types.ObjectId
   start: Date
   time_zone: string
+  shared_with: ISharedWith[]
   created: Date
   updated: Date
   id: string
@@ -16,7 +23,9 @@ export interface IReminder {
 }
 
 export interface IReminderMethods {
-  hasAccess(userId: Types.ObjectId | string): boolean
+  hasAccess(userId: Types.ObjectId | string, requiredPermission?: 'read' | 'write'): boolean
+  shareWith(userId: Types.ObjectId | string, permission?: 'read' | 'write'): void
+  removeSharedAccess(userId: Types.ObjectId | string): void
   shouldTrigger(minutesBefore?: number): boolean
   getTimeUntil(): number
 }
@@ -30,6 +39,7 @@ export interface IReminderStatics {
   findOverdue(options?: { calendarId?: Types.ObjectId | string; userId?: Types.ObjectId | string }): ReturnType<Model<IReminder>['find']>
   findUpcoming(hours?: number, options?: { calendarId?: Types.ObjectId | string; userId?: Types.ObjectId | string }): ReturnType<Model<IReminder>['find']>
   findInDateRange(startDate: Date, endDate: Date, options?: { calendarId?: Types.ObjectId | string }): ReturnType<Model<IReminder>['find']>
+  findAccessibleByUser(userId: Types.ObjectId | string): ReturnType<Model<IReminder>['find']>
 }
 
 export interface IReminderModel extends Model<IReminder, Record<string, never>, IReminderMethods>, IReminderStatics {}

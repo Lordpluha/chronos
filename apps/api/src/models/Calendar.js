@@ -140,7 +140,10 @@ const calendarSchema = new mongoose.Schema(
         }
 
         const sharedAccess = this.shared_with.find((share) => {
-          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
           return shareUserId === userIdStr
         })
 
@@ -155,7 +158,10 @@ const calendarSchema = new mongoose.Schema(
       shareWith(userId, permission = 'read') {
         const userIdStr = userId.toString()
         const existingShare = this.shared_with.find((share) => {
-          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
           return shareUserId === userIdStr
         })
 
@@ -173,7 +179,10 @@ const calendarSchema = new mongoose.Schema(
       removeSharedAccess(userId) {
         const userIdStr = userId.toString()
         this.shared_with = this.shared_with.filter((share) => {
-          const shareUserId = share.user?._id ? share.user._id.toString() : share.user.toString()
+          const shareUser = share.user
+          const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
+            ? shareUser._id.toString()
+            : shareUser.toString()
           return shareUserId !== userIdStr
         })
       },

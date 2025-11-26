@@ -18,6 +18,16 @@ export interface IAttendee {
   responded_at?: Date
 }
 
+export interface IRecurrence {
+  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
+  interval: number
+  byWeekday?: ('MO' | 'TU' | 'WE' | 'TH' | 'FR' | 'SA' | 'SU')[]
+  byMonthDay?: number[]
+  byMonth?: number[]
+  count?: number
+  until?: Date
+}
+
 export interface IEvent {
   title: string
   description: string | null
@@ -31,6 +41,10 @@ export interface IEvent {
   is_all_day: boolean
   status: 'confirmed' | 'tentative' | 'cancelled'
   attendees: IAttendee[]
+  recurrence: IRecurrence | null
+  recurrence_id: Types.ObjectId | null
+  is_recurring: boolean
+  original_start: Date | null
   created: Date
   updated: Date
   id: string
@@ -45,6 +59,9 @@ export interface IEventMethods {
   addAttendee(userIdOrEmail: Types.ObjectId | string, isUser?: boolean): void
   updateAttendeeStatus(userIdOrEmail: Types.ObjectId | string, status: 'invited' | 'accepted' | 'declined' | 'maybe', isUser?: boolean): void
   removeAttendee(userIdOrEmail: Types.ObjectId | string, isUser?: boolean): void
+  generateOccurrences(rangeStart: Date, rangeEnd: Date, maxOccurrences?: number): Date[]
+  isMasterEvent(): boolean
+  isRecurrenceInstance(): boolean
 }
 
 export type IEventDocument = HydratedDocument<IEvent, IEventMethods>
@@ -55,6 +72,8 @@ export interface IEventStatics {
   findByOrganizer(organizerId: Types.ObjectId | string): ReturnType<Model<IEvent>['find']>
   findInDateRange(startDate: Date, endDate: Date, options?: { calendarId?: Types.ObjectId | string }): ReturnType<Model<IEvent>['find']>
   findByAttendee(userId: Types.ObjectId | string): ReturnType<Model<IEvent>['find']>
+  findRecurrenceInstances(recurrenceId: Types.ObjectId | string): ReturnType<Model<IEvent>['find']>
+  findWithRecurrence(calendarId: Types.ObjectId | string, startDate: Date, endDate: Date): Promise<IEvent[]>
 }
 
 export interface IEventModel extends Model<IEvent, Record<string, never>, IEventMethods>, IEventStatics {}
