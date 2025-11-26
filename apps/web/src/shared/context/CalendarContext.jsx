@@ -16,4 +16,7 @@ export const CalendarContext = createContext({
   setSelectedEvent: () => {},
   setLabels: () => {},
   labels: [],
+  isLoadingEvents: false,
+  eventsError: null,
+  defaultCalendarId: null,
 });

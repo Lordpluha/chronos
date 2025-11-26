@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authApi } from '@shared/api/auth';
+import { AuthApi } from '@features/Auth'
+import { toast } from "sonner"
 
 const AuthContext = createContext(null);
 
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const userData = await authApi.getMe();
+      const userData = await AuthApi.getMe();
       setUser(userData);
       setIsAuthenticated(true);
     } catch (error) {
@@ -34,16 +35,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (credentials) => {
-    const response = await authApi.login(credentials);
+    const response = await AuthApi.login(credentials);
     await checkAuth();
     return response;
   };
 
   const logout = async () => {
     try {
-      await authApi.logout();
+      await AuthApi.logout();
     } catch (error) {
-      console.error('Logout error:', error);
+      toast.error('Logout error:', error);
     } finally {
       setUser(null);
       setIsAuthenticated(false);
@@ -51,7 +52,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (data) => {
-    return await authApi.register(data);
+    return await AuthApi.register(data);
   };
 
   const value = {

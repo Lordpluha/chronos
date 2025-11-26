@@ -29,7 +29,7 @@ export const requireAccessToken = async (req, res, next) => {
     next()
   } catch (err) {
     console.log('Access token validation failed:', err.message)
-    return res.status(401)
+    return res.status(401).json()
   }
 }
 

@@ -45,7 +45,10 @@ class CalendarsService {
    * Получить календарь по ID
    */
   async getCalendarById(calendarId, userId) {
-    const calendar = await Calendar.findById(calendarId).populate('owner creator')
+    const calendar = await Calendar.findById(calendarId)
+      .populate('owner creator')
+      .populate('reminders')
+      .populate('events')
 
     if (!calendar) {
       const error = new Error('Calendar not found')

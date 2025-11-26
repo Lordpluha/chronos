@@ -11,12 +11,41 @@ import { CalendarContext } from "@shared/context/CalendarContext";
 import { EventModal } from "../components/EventModal";
 
 export function CalendarPage() {
-  const { monthIndex, showEventModal, viewMode } = useContext(CalendarContext);
+  const { monthIndex, showEventModal, viewMode, isLoadingEvents, eventsError } = useContext(CalendarContext);
   const [currentMonth, setCurrentMonth] = useState(getMonth(monthIndex));
 
   useEffect(() => {
     setCurrentMonth(getMonth(monthIndex));
   }, [monthIndex]);
+
+  if (isLoadingEvents) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-4 text-gray-600">Loading events...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (eventsError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">Failed to load events</h2>
+          <p className="text-gray-600 mb-4">{eventsError.message || 'An error occurred'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">

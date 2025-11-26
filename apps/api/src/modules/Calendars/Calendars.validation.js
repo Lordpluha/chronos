@@ -36,6 +36,7 @@ export const createEventSchema = z.object({
   time_zone: z.string().trim().optional(),
   start: z.string().or(z.date()).transform((val) => new Date(val)),
   end: z.string().or(z.date()).transform((val) => new Date(val)),
+  label: z.enum(['indigo', 'gray', 'green', 'blue', 'red', 'purple']).default('indigo'),
   location: z.object({
     name: z.string().trim().max(500).optional(),
     address: z.string().trim().max(500).optional(),
@@ -63,6 +64,7 @@ export const updateEventSchema = z.object({
   time_zone: z.string().trim().optional(),
   start: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
   end: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
+  label: z.enum(['indigo', 'gray', 'green', 'blue', 'red', 'purple']).optional(),
   location: z.object({
     name: z.string().trim().max(500).optional(),
     address: z.string().trim().max(500).optional(),

@@ -172,6 +172,7 @@ class EventsService {
     if (data.location !== undefined) event.location = data.location
     if (data.is_all_day !== undefined) event.is_all_day = data.is_all_day
     if (data.status !== undefined) event.status = data.status
+    if (data.label !== undefined) event.label = data.label
 
     await event.save()
     return event

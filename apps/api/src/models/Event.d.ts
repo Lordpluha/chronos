@@ -31,6 +31,7 @@ export interface IEvent {
   is_all_day: boolean
   status: 'confirmed' | 'tentative' | 'cancelled'
   attendees: IAttendee[]
+  label: 'indigo' | 'gray' | 'green' | 'blue' | 'red' | 'purple'
   created: Date
   updated: Date
   id: string

@@ -4,24 +4,15 @@ import React, { useContext, useEffect, useState } from "react";
 
 export default function Day({ day }) {
   const [dayEvents, setDayEvents] = useState([]);
-  const { setDaySelected, setShowEventModal, savedEvents, daySelected, setSelectedEvent } =
+  const { setDaySelected, setShowEventModal, filteredEvents, daySelected, setSelectedEvent } =
     useContext(CalendarContext);
 
-  const labelColorMap = {
-    indigo: "bg-indigo-200",
-    gray: "bg-gray-200",
-    green: "bg-green-200",
-    blue: "bg-blue-200",
-    red: "bg-red-200",
-    purple: "bg-purple-200",
-  };
-
   useEffect(() => {
-    const events = savedEvents.filter(
+    const events = filteredEvents.filter(
       (evt) => dayjs(evt.day).format("DD-MM-YY") === day.format("DD-MM-YY")
     );
     setDayEvents(events)
-  }, [savedEvents, day]);
+  }, [filteredEvents, day]);
 
   function getCurrentDayClass() {
     const today = dayjs().format("DD-MM-YYYY");
@@ -58,9 +49,19 @@ export default function Day({ day }) {
               setSelectedEvent(evt);
               setShowEventModal(true);
             }}
-            className={`${labelColorMap[evt.label] || "bg-blue-200"} p-1 mr-3 text-gray-600 text-sm rounded mb-1 truncate`}
+            className="p-1 mr-3 text-gray-600 text-xs rounded mb-1 truncate cursor-pointer hover:opacity-80 transition-opacity"
+            style={{
+              backgroundColor: evt.color ? `${evt.color}33` : '#3b82f633',
+              borderLeft: `4px solid ${evt.color || '#3b82f6'}`
+            }}
           >
-            {evt.title}
+            <div className="font-medium">{evt.title}</div>
+            {evt.startTime && (
+              <div className="text-[10px] opacity-75">
+                {evt.startTime}
+                {evt.endTime && ` - ${evt.endTime}`}
+              </div>
+            )}
           </div>
         ))}
       </div>

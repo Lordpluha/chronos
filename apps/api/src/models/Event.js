@@ -128,6 +128,12 @@ const eventSchema = new mongoose.Schema(
         },
       },
     ],
+    label: {
+      type: String,
+      enum: ['indigo', 'gray', 'green', 'blue', 'red', 'purple'],
+      default: 'indigo',
+      trim: true,
+    },
   },
   {
     timestamps: {
@@ -229,11 +235,11 @@ const eventSchema = new mongoose.Schema(
        */
       hasAccess(userId) {
         const userIdStr = userId.toString()
-        
+
         // Безопасное получение ID создателя и организатора
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
         const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
-        
+
         return creatorId === userIdStr || organizerId === userIdStr
       },
 

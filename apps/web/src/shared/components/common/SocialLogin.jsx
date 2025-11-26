@@ -3,7 +3,6 @@ import { Button } from "@shared/ui/button";
 import { Field, FieldSeparator, FieldDescription } from "@shared/ui/field";
 import { useNavigate } from "react-router";
 import { ROUTES } from "@shared/routes";
-import { authApi } from "@shared/api/auth";
 
 export function SocialLogin({ isLoading, mode = "login" }) {
   const navigate = useNavigate();
