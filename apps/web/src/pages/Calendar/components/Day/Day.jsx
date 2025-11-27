@@ -28,7 +28,7 @@ export default function Day({ day }) {
   }
 
   return (
-    <div className="border border-gray-200 flex flex-col p-1 h-full">
+    <div className="border border-gray-200 dark:border-gray-700 flex flex-col p-1 h-full">
       <header className="flex flex-col items-center">
         <p className={`text-sm text-center ${getCurrentDayClass()}`}>
           {day.format("DD")}
@@ -49,7 +49,7 @@ export default function Day({ day }) {
               setSelectedEvent(evt);
               setShowEventModal(true);
             }}
-            className="p-1 mr-3 text-gray-600 text-xs rounded mb-1 truncate cursor-pointer hover:opacity-80 transition-opacity"
+            className="p-1 mr-3 text-gray-700 dark:text-gray-200 text-xs rounded mb-1 truncate cursor-pointer hover:opacity-80 transition-opacity"
             style={{
               backgroundColor: evt.color ? `${evt.color}33` : '#3b82f633',
               borderLeft: `4px solid ${evt.color || '#3b82f6'}`

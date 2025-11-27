@@ -5,6 +5,7 @@ import { ForgotPassword } from '@pages/ForgotPassword'
 import { ResetPassword } from '@pages/ResetPassword'
 import { ProfilePage } from '@pages/Profile'
 import { CalendarPage } from '@pages/Calendar'
+import { RemindersPage } from '@pages/RemindersPage'
 import { ROUTES } from '@shared/routes'
 import { GuestRoute, PrivateRoute } from '@shared/components/ProtectedRoute'
 import { createBrowserRouter } from 'react-router'
@@ -59,6 +60,14 @@ export const router = createBrowserRouter([
     element: (
       <PrivateRoute>
         <CalendarPage />
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: ROUTES.reminders,
+    element: (
+      <PrivateRoute>
+        <RemindersPage />
       </PrivateRoute>
     ),
   },

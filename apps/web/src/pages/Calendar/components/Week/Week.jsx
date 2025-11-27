@@ -1,15 +1,18 @@
 import React, { useContext, useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useUpdateReminder } from '@features/Reminders';
 import { toast } from 'sonner';
+import { ResizableWeekEvent } from './ResizableWeekEvent';
 import styles from './Week.module.css';
 
 export const Week = () => {
   const { daySelected, setDaySelected, filteredEvents, setSelectedEvent, setShowEventModal, dispatchCalEvent, visibleCalendarIds } = useContext(CalendarContext);
+  const { mutate: updateReminder } = useUpdateReminder();
   const [draggedEvent, setDraggedEvent] = useState(null);
-  const [previewEvent, setPreviewEvent] = useState(null); // Для визуального превью
-  const updateTimeoutRef = useRef(null); // Для debounce обновления
-  const isUpdatingRef = useRef(false); // Флаг что идет обновление
+  const [localUpdates, setLocalUpdates] = useState({});
+  const updateTimeoutRef = useRef(null);
+  const pendingUpdatesRef = useRef(new Set());
 
   // Cleanup таймера при размонтировании
   useEffect(() => {
@@ -20,25 +23,36 @@ export const Week = () => {
     };
   }, []);
 
-  // Очистить previewEvent когда filteredEvents обновляются и содержат обновленное событие
+  // Очистить localUpdates когда событие реально обновилось из API
   useEffect(() => {
-    if (previewEvent && isUpdatingRef.current) {
-      const updatedEventExists = filteredEvents.some(evt => {
-        if (evt.id !== previewEvent.id) return false;
-        // Проверить, совпадают ли время и день с превью
-        return evt.day === previewEvent.day &&
-               evt.startTime === previewEvent.startTime &&
-               evt.endTime === previewEvent.endTime;
-      });
+    if (Object.keys(localUpdates).length === 0) return;
 
-      if (updatedEventExists) {
-        setPreviewEvent(null);
-        isUpdatingRef.current = false;
-        // Показываем toast только здесь - когда обновление действительно завершено
-        toast.success('Event updated successfully');
+    // Проверить каждое локальное обновление
+    Object.keys(localUpdates).forEach(eventId => {
+      // Пропустить если обновление еще в процессе отправки
+      if (pendingUpdatesRef.current.has(eventId)) return;
+
+      const localUpdate = localUpdates[eventId];
+      const apiEvent = filteredEvents.find(e => e.id === eventId);
+
+      if (apiEvent) {
+        // Проверить, совпадает ли endTime из API с локальным обновлением
+        const matches =
+          (!localUpdate.endTime || apiEvent.endTime === localUpdate.endTime) &&
+          (!localUpdate.startTime || apiEvent.startTime === localUpdate.startTime) &&
+          (!localUpdate.day || apiEvent.day === localUpdate.day);
+
+        if (matches) {
+          console.log('✅ Event synced with API, removing local update:', eventId);
+          setLocalUpdates(prev => {
+            const newUpdates = { ...prev };
+            delete newUpdates[eventId];
+            return newUpdates;
+          });
+        }
       }
-    }
-  }, [filteredEvents, previewEvent]);
+    });
+  }, [filteredEvents, localUpdates]);
 
   // Get the week days starting from Sunday
   const weekDays = useMemo(() => {
@@ -55,26 +69,20 @@ export const Week = () => {
     return hours * 60 + minutes;
   };
 
-  // Получить события для конкретного дня (включая превью)
+  // Получить события для конкретного дня с локальными обновлениями
   const getEventsForDay = (day) => {
     let dayEvents = filteredEvents.filter(evt => {
       const eventDate = dayjs(evt.day);
       return eventDate.format('YYYY-MM-DD') === day.format('YYYY-MM-DD');
     });
 
-    // Если есть превью, скрыть оригинальное событие
-    if (previewEvent) {
-      dayEvents = dayEvents.filter(evt => evt.id !== previewEvent.id);
-
-      // Проверить, должно ли превью событие отображаться (применить фильтр по calendar)
-      const previewCalendarVisible = visibleCalendarIds.includes(previewEvent.calendarId);
-
-      // Добавить превью если оно для этого дня И его календарь видим
-      const previewDate = dayjs(previewEvent.day);
-      if (previewDate.format('YYYY-MM-DD') === day.format('YYYY-MM-DD') && previewCalendarVisible) {
-        dayEvents = [...dayEvents, previewEvent];
+    // Применить локальные обновления
+    dayEvents = dayEvents.map(evt => {
+      if (localUpdates[evt.id]) {
+        return { ...evt, ...localUpdates[evt.id] };
       }
-    }
+      return evt;
+    });
 
     return dayEvents.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
   };
@@ -136,19 +144,31 @@ export const Week = () => {
   };
 
   // Функция для выполнения реального обновления с debounce
-  const scheduleUpdate = useCallback((updatedEvent) => {
+  const scheduleUpdate = useCallback((eventId, updates) => {
+    // Пометить событие как "в процессе обновления"
+    pendingUpdatesRef.current.add(eventId);
+
     // Очистить предыдущий таймер если он есть
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
 
-    // Установить новый таймер - короткая задержка для группировки быстрых перетаскиваний
+    // Установить новый таймер - короткая задержка для группировки быстрых изменений
     updateTimeoutRef.current = setTimeout(() => {
-      isUpdatingRef.current = true; // Отметить что начали обновление
-      dispatchCalEvent({ type: 'update', payload: updatedEvent });
-      // Toast будет показан в useEffect когда данные обновятся
-    }, 300);
-  }, [dispatchCalEvent]);
+      // Найти оригинальное событие
+      const originalEvent = filteredEvents.find(e => e.id === eventId);
+      if (originalEvent) {
+        const updatedEvent = { ...originalEvent, ...updates };
+        console.log('🚀 Sending update to server:', updatedEvent);
+        dispatchCalEvent({ type: 'update', payload: updatedEvent });
+
+        // Убрать пометку через 2 секунды (достаточно времени для API)
+        setTimeout(() => {
+          pendingUpdatesRef.current.delete(eventId);
+        }, 2000);
+      }
+    }, 500);
+  }, [dispatchCalEvent, filteredEvents]);
 
   const handleDrop = (e, day, hour) => {
     e.preventDefault();
@@ -169,44 +189,131 @@ export const Week = () => {
     const newEndMinute = newEndMinutes % 60;
     const newEndTime = `${String(newEndHour).padStart(2, '0')}:${String(newEndMinute).padStart(2, '0')}`;
 
-    const updatedEvent = {
-      ...draggedEvent,
-      day: newDay,
-      startTime: newStartTime,
-      endTime: newEndTime,
-    };
+    if (draggedEvent.isReminder) {
+      // Сразу обновить локально для напоминания
+      setLocalUpdates(prev => ({
+        ...prev,
+        [draggedEvent.id]: {
+          day: newDay,
+          startTime: newStartTime,
+          endTime: newEndTime,
+        }
+      }));
 
-    // Показать превью и запланировать обновление
-    setPreviewEvent(updatedEvent);
-    scheduleUpdate(updatedEvent);
+      // Обновить время напоминания на сервере
+      const reminderDateTime = dayjs(newDay)
+        .hour(newStartHour)
+        .minute(newStartMinute);
+
+      updateReminder({
+        id: draggedEvent.reminderId,
+        data: {
+          reminder_at: reminderDateTime.toISOString(),
+        },
+      });
+
+      // Очистить локальное обновление через 2 секунды
+      setTimeout(() => {
+        setLocalUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[draggedEvent.id];
+          return newUpdates;
+        });
+      }, 2000);
+    } else {
+      // Сразу обновить локально
+      setLocalUpdates(prev => ({
+        ...prev,
+        [draggedEvent.id]: {
+          day: newDay,
+          startTime: newStartTime,
+          endTime: newEndTime,
+        }
+      }));
+
+      // Запланировать обновление на сервере
+      scheduleUpdate(draggedEvent.id, {
+        day: newDay,
+        startTime: newStartTime,
+        endTime: newEndTime,
+      });
+    }
+
     setDraggedEvent(null);
   };
 
   const handleDragEnd = () => {
-    // Очистить состояние перетаскивания
     setDraggedEvent(null);
   };
 
+  const handleResize = useCallback((updatedEvent) => {
+    console.log('🔧 Resize event:', updatedEvent);
+
+    if (updatedEvent.isReminder) {
+      // Сразу обновить локально для напоминания
+      setLocalUpdates(prev => ({
+        ...prev,
+        [updatedEvent.id]: {
+          endTime: updatedEvent.endTime,
+        }
+      }));
+
+      // Обновить время напоминания на сервере
+      const reminderDateTime = dayjs(updatedEvent.day)
+        .hour(parseInt(updatedEvent.endTime.split(':')[0]))
+        .minute(parseInt(updatedEvent.endTime.split(':')[1]));
+
+      updateReminder({
+        id: updatedEvent.reminderId,
+        data: {
+          reminder_at: reminderDateTime.toISOString(),
+        },
+      });
+
+      // Очистить локальное обновление через 2 секунды (после обновления с сервера)
+      setTimeout(() => {
+        setLocalUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[updatedEvent.id];
+          return newUpdates;
+        });
+      }, 2000);
+    } else {
+      // Сразу обновить локально
+      setLocalUpdates(prev => ({
+        ...prev,
+        [updatedEvent.id]: {
+          endTime: updatedEvent.endTime,
+        }
+      }));
+
+      // Запланировать обновление на сервере
+      scheduleUpdate(updatedEvent.id, {
+        endTime: updatedEvent.endTime,
+      });
+    }
+  }, [updateReminder, scheduleUpdate]);
+
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800">
       {/* Week header with dates */}
-      <div className={`grid border-b sticky top-0 bg-white z-10 pr-1.5 ${styles.weekGrid}`}>
-        <div className="p-2 border-r text-xs text-gray-500 text-right pr-3 flex items-center justify-end">Time</div>
+      <div className={`grid border-b dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10 pr-1.5 ${styles.weekGrid}`}>
+        <div className="p-2 border-r dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-right pr-3 flex items-center justify-end">Time</div>
         {weekDays.map((day, idx) => (
           <div
             key={idx}
-            className={`py-4 text-center border-r ${
-              isToday(day) ? 'bg-blue-50' : ''
+            className={`py-4 text-center border-r dark:border-gray-700 ${
+              isToday(day) ? 'bg-blue-50 dark:bg-blue-900/30' : ''
             }`}
           >
-            <div className="text-xs text-gray-500 uppercase">
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">
               {day.format('ddd')}
             </div>
             <div
               className={`text-2xl font-semibold mt-1 ${
                 isToday(day)
                   ? 'bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center mx-auto'
-                  : 'text-gray-700'
+                  : 'text-gray-700 dark:text-gray-200'
               }`}
             >
               {day.format('DD')}
@@ -219,15 +326,15 @@ export const Week = () => {
       <div className="flex-1 w-full overflow-y-auto scrollbar-custom">
         <div className="relative">
           {hours.map((hour) => (
-            <div key={hour} className={`grid border-b min-h-20 relative ${styles.weekGrid}`}>
-              <div className="p-2 border-r text-xs text-gray-500 text-right pr-3">
+            <div key={hour} className={`grid border-b dark:border-gray-700 min-h-20 relative ${styles.weekGrid}`}>
+              <div className="p-2 border-r dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-right pr-3">
                 {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
               </div>
               {weekDays.map((day, idx) => (
                 <div
                   key={idx}
-                  className={`border-r relative hover:bg-gray-50 ${
-                    isToday(day) ? 'bg-blue-50/30' : ''
+                  className={`border-r dark:border-gray-700 relative hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                    isToday(day) ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''
                   }`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day, hour)}
@@ -245,42 +352,17 @@ export const Week = () => {
 
               return (
                 <div key={dayIdx} className="border-r relative">
-                  {eventPositions.map((pos) => {
-                    const widthPercent = 100 / pos.maxColumns;
-                    const leftPercent = (pos.column / pos.maxColumns) * 100;
-
-                    return (
-                      <div
-                        key={pos.event.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, pos.event)}
-                        onDragEnd={handleDragEnd}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEventClick(pos.event, day);
-                        }}
-                        className={`absolute pointer-events-auto p-1.5 rounded border-l-4 cursor-move hover:opacity-90 transition-all shadow-sm overflow-hidden ${
-                          previewEvent?.id === pos.event.id ? 'opacity-70 ring-2 ring-blue-400' : ''
-                        }`}
-                        style={{
-                          top: `${pos.top}px`,
-                          height: `${pos.height}px`,
-                          width: `calc(${widthPercent}% - 4px)`,
-                          left: `calc(${leftPercent}% + 2px)`,
-                          backgroundColor: pos.event.color ? `${pos.event.color}33` : '#3b82f633',
-                          borderLeftColor: pos.event.color || '#3b82f6',
-                        }}
-                      >
-                        <div className="font-semibold text-xs truncate">{pos.event.title}</div>
-                        {pos.event.startTime && (
-                          <div className="text-[10px] opacity-75 truncate">
-                            {pos.event.startTime}
-                            {pos.event.endTime && ` - ${pos.event.endTime}`}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {eventPositions.map((pos) => (
+                    <ResizableWeekEvent
+                      key={pos.event.id}
+                      pos={pos}
+                      day={day}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onClick={handleEventClick}
+                      onResize={handleResize}
+                    />
+                  ))}
                 </div>
               );
             })}

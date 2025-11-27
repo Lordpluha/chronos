@@ -46,6 +46,15 @@ const reminderSchema = new mongoose.Schema(
       default: 'UTC',
       trim: true,
     },
+    completed: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    completed_at: {
+      type: Date,
+      default: null,
+    },
     shared_with: [
       {
         user: {

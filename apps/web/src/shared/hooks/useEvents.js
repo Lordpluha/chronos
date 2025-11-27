@@ -65,13 +65,17 @@ export function useUpdateEvent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => EventApi.update(id, data),
-    onSuccess: () => {
+    mutationFn: ({ id, data }) => {
+      console.log('🔄 useUpdateEvent: Sending to API', { id, data });
+      return EventApi.update(id, data);
+    },
+    onSuccess: (response) => {
+      console.log('✅ useUpdateEvent: Success response', response);
       queryClient.invalidateQueries({ queryKey: eventKeys.all });
-      toast.success('Event updated successfully');
+      // Toast показывается в Week.jsx и DayView.jsx после проверки обновления
     },
     onError: (err) => {
-      console.error('Update event error:', err);
+      console.error('❌ Update event error:', err);
       toast.error(err.response?.data?.message || 'Failed to update event');
     },
   });

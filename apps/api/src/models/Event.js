@@ -133,6 +133,7 @@ const eventSchema = new mongoose.Schema(
       enum: ['indigo', 'gray', 'green', 'blue', 'red', 'purple'],
       default: 'indigo',
       trim: true,
+    },
     recurrence: {
       type: {
         frequency: {

@@ -58,7 +58,7 @@ export const CalendarList = () => {
     const isVisible = visibleCalendarIds.includes(calendar.id);
 
     return (
-      <div className="flex items-center justify-between py-2 px-1 hover:bg-gray-50 rounded group">
+      <div className="flex items-center justify-between py-2 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded group">
         <label className="flex items-center flex-1 cursor-pointer">
           <Checkbox
             checked={isVisible}
@@ -69,10 +69,10 @@ export const CalendarList = () => {
             className="w-4 h-4 rounded-sm mr-3 shrink-0"
             style={{ backgroundColor: calendar.color }}
           />
-          <span className="text-sm text-gray-700 truncate flex-1">
+          <span className="text-sm text-gray-700 dark:text-gray-200 truncate flex-1">
             {calendar.title}
             {calendar.is_default && (
-              <span className="ml-2 text-xs text-gray-400">(default)</span>
+              <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">(default)</span>
             )}
           </span>
         </label>
@@ -115,7 +115,7 @@ export const CalendarList = () => {
       {/* My Calendars Section */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700">Мои календари</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Мои календари</h3>
           <Button
             variant="ghost"
             size="sm"
@@ -127,7 +127,7 @@ export const CalendarList = () => {
         </div>
 
         {myCalendars.length === 0 ? (
-          <p className="text-xs text-gray-400 italic">No calendars yet</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 italic">No calendars yet</p>
         ) : (
           <div className="space-y-1">
             {myCalendars.map(calendar => (
@@ -140,7 +140,7 @@ export const CalendarList = () => {
       {/* Other Calendars Section */}
       {otherCalendars.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Другие календари</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3">Другие календари</h3>
           <div className="space-y-1">
             {otherCalendars.map(calendar => (
               <CalendarItem key={calendar.id} calendar={calendar} />

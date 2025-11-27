@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent, useCalendars, useCreateCalendar } from "@shared/hooks";
 import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
+import { useReminders, useReminderNotifications } from "@features/Reminders";
 
 export const CalendarContextWrapper = (props) => {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -12,13 +13,16 @@ export const CalendarContextWrapper = (props) => {
   const [daySelected, setDaySelected] = useState(dayjs());
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [viewMode, setViewMode] = useState('month'); // 'day', 'week', 'month', 'year'
-  const [visibleCalendarIds, setVisibleCalendarIds] = useState([]); // IDs of visible calendars
-  const [calendarCreated, setCalendarCreated] = useState(false); // Флаг для предотвращения дублирования
+  const [viewMode, setViewMode] = useState('month');
+  const [visibleCalendarIds, setVisibleCalendarIds] = useState([]);
+  const [calendarCreated, setCalendarCreated] = useState(false);
 
-  // React Query hooks - запускаются только если пользователь авторизован
   const { data: calendarsData, isLoading: isLoadingCalendars } = useCalendars({ enabled: isAuthenticated });
   const { data: eventsData, isLoading, error } = useEvents({ enabled: isAuthenticated });
+  const { reminders, loading: loadingReminders } = useReminders();
+
+  useReminderNotifications(reminders);
+
   const createEventMutation = useCreateEvent();
   const updateEventMutation = useUpdateEvent();
   const deleteEventMutation = useDeleteEvent();
@@ -79,7 +83,7 @@ export const CalendarContextWrapper = (props) => {
     // API возвращает массив напрямую, а не { events: [...] }
     const events = Array.isArray(eventsData) ? eventsData : eventsData.events || [];
 
-    return events.map(event => {
+    const transformed = events.map(event => {
       // Find calendar to get its color
       const calendar = calendars.find(cal =>
         cal.id === (event.calendar?._id || event.calendar)
@@ -96,7 +100,40 @@ export const CalendarContextWrapper = (props) => {
         color: calendar?.color || '#3b82f6', // Use calendar color
       };
     });
+
+    console.log('📊 savedEvents transformed:', transformed.length, 'events');
+    return transformed;
   }, [eventsData, calendars]);
+
+  const reminderEvents = useMemo(() => {
+    if (!reminders || reminders.length === 0) return [];
+
+    // Фильтруем выполненные напоминания
+    const activeReminders = reminders.filter(reminder => !reminder.completed);
+
+    return activeReminders.map(reminder => {
+      const calendar = calendars.find(cal =>
+        cal.id === (reminder.calendar?._id || reminder.calendar)
+      );
+
+      return {
+        id: `reminder-${reminder._id}`,
+        title: `🔔 ${reminder.title}`,
+        description: reminder.description || '',
+        day: new Date(reminder.start).getTime(),
+        startTime: dayjs(reminder.start).format('HH:mm'),
+        endTime: dayjs(reminder.start).add(30, 'minute').format('HH:mm'),
+        calendarId: reminder.calendar?._id || reminder.calendar,
+        color: calendar?.color || '#f59e0b',
+        isReminder: true,
+        reminderId: reminder._id,
+      };
+    });
+  }, [reminders, calendars]);
+
+  const allEvents = useMemo(() => {
+    return [...savedEvents, ...reminderEvents];
+  }, [savedEvents, reminderEvents]);
 
   // Dispatch function to handle CRUD operations
   const dispatchCalEvent = ({ type, payload }) => {
@@ -129,12 +166,22 @@ export const CalendarContextWrapper = (props) => {
         break;
       }
       case "update": {
+        console.log('📤 CalendarContext update payload:', payload);
         const dayDate = dayjs(payload.day);
         const [startHours, startMinutes] = (payload.startTime || '09:00').split(':');
         const [endHours, endMinutes] = (payload.endTime || '10:00').split(':');
 
         const start = dayDate.hour(parseInt(startHours)).minute(parseInt(startMinutes)).second(0).toDate();
         const end = dayDate.hour(parseInt(endHours)).minute(parseInt(endMinutes)).second(0).toDate();
+
+        console.log('📤 Sending to API:', {
+          id: payload.id,
+          title: payload.title,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          startTime: payload.startTime,
+          endTime: payload.endTime,
+        });
 
         updateEventMutation.mutate({
           id: payload.id,
@@ -157,10 +204,10 @@ export const CalendarContextWrapper = (props) => {
 
   // Filter events by visible calendars
   const filteredEvents = useMemo(() => {
-    return savedEvents.filter((evt) =>
+    return allEvents.filter((evt) =>
       visibleCalendarIds.includes(evt.calendarId)
     );
-  }, [savedEvents, visibleCalendarIds]);
+  }, [allEvents, visibleCalendarIds]);
 
   // Toggle calendar visibility
   const toggleCalendarVisibility = (calendarId) => {

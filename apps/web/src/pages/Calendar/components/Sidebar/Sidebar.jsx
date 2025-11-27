@@ -7,7 +7,7 @@ import { ScrollArea } from "@shared/ui/scroll-area";
 
 export const Sidebar = () => {
   return (
-    <aside className="border-r w-72 flex flex-col bg-white">
+    <aside className="border-r dark:border-gray-700 w-72 flex flex-col bg-white dark:bg-gray-800 transition-colors">
       <div className="p-5 shrink-0">
         <CreateEventButton />
       </div>

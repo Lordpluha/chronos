@@ -24,10 +24,10 @@ export default function UserAccountInfo() {
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-3">
         <div className="text-right">
-          <p className="text-sm font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {user.full_name}
           </p>
-          <p className="text-xs text-gray-500">{user.email}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
         </div>
         <div className="w-10 h-10 bg-linear-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
           <span className="text-white font-semibold text-sm">

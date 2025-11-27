@@ -36,12 +36,11 @@ export const UpcomingEvents = () => {
       style={{
         backgroundColor: event.color ? `${event.color}22` : '#3b82f622',
         borderColor: event.color ? `${event.color}66` : '#3b82f666',
-        color: '#374151', // gray-700
       }}
     >
-      <div className="font-medium text-sm truncate">{event.title}</div>
+      <div className="font-medium text-sm truncate text-gray-900 dark:text-gray-100">{event.title}</div>
       {event.startTime && (
-        <div className="flex items-center gap-1 text-xs mt-1 opacity-80">
+        <div className="flex items-center gap-1 text-xs mt-1 opacity-80 text-gray-700 dark:text-gray-300">
           <Clock className="h-3 w-3" />
           <span>
             {event.startTime}
@@ -54,7 +53,7 @@ export const UpcomingEvents = () => {
 
   return (
     <div className="mt-6">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-3 flex items-center gap-2">
         <Calendar className="h-4 w-4" />
         Upcoming Events
       </h3>
@@ -62,25 +61,25 @@ export const UpcomingEvents = () => {
       <ScrollArea className="h-[280px] pr-3">
         {/* Today */}
         <div className="mb-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             Today
           </div>
           {todayEvents.length > 0 ? (
             todayEvents.map((evt) => <EventCard key={evt.id} event={evt} />)
           ) : (
-            <div className="text-xs text-gray-400 italic py-2">No events today</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500 italic py-2">No events today</div>
           )}
         </div>
 
         {/* Tomorrow */}
         <div>
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             Tomorrow
           </div>
           {tomorrowEvents.length > 0 ? (
             tomorrowEvents.map((evt) => <EventCard key={evt.id} event={evt} />)
           ) : (
-            <div className="text-xs text-gray-400 italic py-2">
+            <div className="text-xs text-gray-400 dark:text-gray-500 italic py-2">
               No events tomorrow
             </div>
           )}

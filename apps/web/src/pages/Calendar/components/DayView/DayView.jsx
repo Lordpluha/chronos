@@ -1,14 +1,17 @@
 import React, { useContext, useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useUpdateReminder } from '@features/Reminders';
 import { toast } from 'sonner';
+import { ResizableDayEvent } from './ResizableDayEvent';
 
 export const DayView = () => {
   const { daySelected, filteredEvents, setSelectedEvent, setShowEventModal, dispatchCalEvent, visibleCalendarIds } = useContext(CalendarContext);
+  const { mutate: updateReminder } = useUpdateReminder();
   const [draggedEvent, setDraggedEvent] = useState(null);
-  const [previewEvent, setPreviewEvent] = useState(null); // Для визуального превью
-  const updateTimeoutRef = useRef(null); // Для debounce обновления
-  const isUpdatingRef = useRef(false); // Флаг что идет обновление
+  const [localUpdates, setLocalUpdates] = useState({});
+  const updateTimeoutRef = useRef(null);
+  const pendingUpdatesRef = useRef(new Set());
 
   // Cleanup таймера при размонтировании
   useEffect(() => {
@@ -19,25 +22,36 @@ export const DayView = () => {
     };
   }, []);
 
-  // Очистить previewEvent когда filteredEvents обновляются и содержат обновленное событие
+  // Очистить localUpdates когда событие реально обновилось из API
   useEffect(() => {
-    if (previewEvent && isUpdatingRef.current) {
-      const updatedEventExists = filteredEvents.some(evt => {
-        if (evt.id !== previewEvent.id) return false;
-        // Проверить, совпадают ли время И день с превью
-        return evt.day === previewEvent.day &&
-               evt.startTime === previewEvent.startTime &&
-               evt.endTime === previewEvent.endTime;
-      });
+    if (Object.keys(localUpdates).length === 0) return;
 
-      if (updatedEventExists) {
-        setPreviewEvent(null);
-        isUpdatingRef.current = false;
-        // Показываем toast только здесь - когда обновление действительно завершено
-        toast.success('Event updated successfully');
+    // Проверить каждое локальное обновление
+    Object.keys(localUpdates).forEach(eventId => {
+      // Пропустить если обновление еще в процессе отправки
+      if (pendingUpdatesRef.current.has(eventId)) return;
+
+      const localUpdate = localUpdates[eventId];
+      const apiEvent = filteredEvents.find(e => e.id === eventId);
+
+      if (apiEvent) {
+        // Проверить, совпадает ли endTime из API с локальным обновлением
+        const matches =
+          (!localUpdate.endTime || apiEvent.endTime === localUpdate.endTime) &&
+          (!localUpdate.startTime || apiEvent.startTime === localUpdate.startTime) &&
+          (!localUpdate.day || apiEvent.day === localUpdate.day);
+
+        if (matches) {
+          console.log('✅ Event synced with API, removing local update:', eventId);
+          setLocalUpdates(prev => {
+            const newUpdates = { ...prev };
+            delete newUpdates[eventId];
+            return newUpdates;
+          });
+        }
       }
-    }
-  }, [filteredEvents, previewEvent]);
+    });
+  }, [filteredEvents, localUpdates]);
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -55,20 +69,16 @@ export const DayView = () => {
         return eventDate.format('YYYY-MM-DD') === daySelected.format('YYYY-MM-DD');
       });
 
-    // Если есть превью, скрыть оригинальное событие и добавить превью (с проверкой фильтра)
-    if (previewEvent) {
-      dayEvents = dayEvents.filter(evt => evt.id !== previewEvent.id);
-
-      // Проверить, должно ли превью событие отображаться (применить фильтр по calendar)
-      const previewCalendarVisible = visibleCalendarIds.includes(previewEvent.calendarId);
-
-      if (previewCalendarVisible) {
-        dayEvents = [...dayEvents, previewEvent];
+    // Применить локальные обновления
+    dayEvents = dayEvents.map(evt => {
+      if (localUpdates[evt.id]) {
+        return { ...evt, ...localUpdates[evt.id] };
       }
-    }
+      return evt;
+    });
 
     return dayEvents.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  }, [filteredEvents, daySelected, previewEvent, visibleCalendarIds]);
+  }, [filteredEvents, daySelected, localUpdates]);
 
   const calculateEventPositions = () => {
     const positions = [];
@@ -120,19 +130,31 @@ export const DayView = () => {
   };
 
   // Функция для выполнения реального обновления с debounce
-  const scheduleUpdate = useCallback((updatedEvent) => {
+  const scheduleUpdate = useCallback((eventId, updates) => {
+    // Пометить событие как "в процессе обновления"
+    pendingUpdatesRef.current.add(eventId);
+
     // Очистить предыдущий таймер если он есть
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
 
-    // Установить новый таймер - короткая задержка для группировки быстрых перетаскиваний
+    // Установить новый таймер - короткая задержка для группировки быстрых изменений
     updateTimeoutRef.current = setTimeout(() => {
-      isUpdatingRef.current = true; // Отметить что начали обновление
-      dispatchCalEvent({ type: 'update', payload: updatedEvent });
-      // Toast будет показан в useEffect когда данные обновятся
-    }, 300);
-  }, [dispatchCalEvent]);
+      // Найти оригинальное событие
+      const originalEvent = filteredEvents.find(e => e.id === eventId);
+      if (originalEvent) {
+        const updatedEvent = { ...originalEvent, ...updates };
+        console.log('🚀 Sending update to server:', updatedEvent);
+        dispatchCalEvent({ type: 'update', payload: updatedEvent });
+
+        // Убрать пометку через 2 секунды (достаточно времени для API)
+        setTimeout(() => {
+          pendingUpdatesRef.current.delete(eventId);
+        }, 2000);
+      }
+    }, 500);
+  }, [dispatchCalEvent, filteredEvents]);
 
   const handleDrop = (e, hour) => {
     e.preventDefault();
@@ -154,31 +176,115 @@ export const DayView = () => {
     const newEndMinute = newEndMinutes % 60;
     const newEndTime = `${String(newEndHour).padStart(2, '0')}:${String(newEndMinute).padStart(2, '0')}`;
 
-    const updatedEvent = {
-      ...draggedEvent,
-      day: draggedEvent.day, // Оставляем тот же день
-      startTime: newStartTime,
-      endTime: newEndTime,
-    };
+    if (draggedEvent.isReminder) {
+      // Сразу обновить локально для напоминания
+      setLocalUpdates(prev => ({
+        ...prev,
+        [draggedEvent.id]: {
+          startTime: newStartTime,
+          endTime: newEndTime,
+        }
+      }));
 
-    // Показать превью и запланировать обновление
-    setPreviewEvent(updatedEvent);
-    scheduleUpdate(updatedEvent);
+      // Обновить время напоминания на сервере
+      const reminderDateTime = dayjs(draggedEvent.day)
+        .hour(newStartHour)
+        .minute(newStartMinute);
+
+      updateReminder({
+        id: draggedEvent.reminderId,
+        data: {
+          reminder_at: reminderDateTime.toISOString(),
+        },
+      });
+
+      // Очистить локальное обновление через 2 секунды
+      setTimeout(() => {
+        setLocalUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[draggedEvent.id];
+          return newUpdates;
+        });
+      }, 2000);
+    } else {
+      // Сразу обновить локально
+      setLocalUpdates(prev => ({
+        ...prev,
+        [draggedEvent.id]: {
+          startTime: newStartTime,
+          endTime: newEndTime,
+        }
+      }));
+
+      // Запланировать обновление на сервере
+      scheduleUpdate(draggedEvent.id, {
+        startTime: newStartTime,
+        endTime: newEndTime,
+      });
+    }
+
     setDraggedEvent(null);
   };
 
   const handleDragEnd = () => {
-    // Очистить состояние перетаскивания
     setDraggedEvent(null);
   };
+
+  const handleResize = useCallback((updatedEvent) => {
+    console.log('🔧 Resize event:', updatedEvent);
+
+    if (updatedEvent.isReminder) {
+      // Сразу обновить локально для напоминания
+      setLocalUpdates(prev => ({
+        ...prev,
+        [updatedEvent.id]: {
+          endTime: updatedEvent.endTime,
+        }
+      }));
+
+      // Обновить время напоминания на сервере
+      const reminderDateTime = dayjs(updatedEvent.day)
+        .hour(parseInt(updatedEvent.endTime.split(':')[0]))
+        .minute(parseInt(updatedEvent.endTime.split(':')[1]));
+
+      updateReminder({
+        id: updatedEvent.reminderId,
+        data: {
+          reminder_at: reminderDateTime.toISOString(),
+        },
+      });
+
+      // Очистить локальное обновление через 2 секунды (после обновления с сервера)
+      setTimeout(() => {
+        setLocalUpdates(prev => {
+          const newUpdates = { ...prev };
+          delete newUpdates[updatedEvent.id];
+          return newUpdates;
+        });
+      }, 2000);
+    } else {
+      // Сразу обновить локально
+      setLocalUpdates(prev => ({
+        ...prev,
+        [updatedEvent.id]: {
+          endTime: updatedEvent.endTime,
+        }
+      }));
+
+      // Запланировать обновление на сервере
+      scheduleUpdate(updatedEvent.id, {
+        endTime: updatedEvent.endTime,
+      });
+    }
+  }, [updateReminder, scheduleUpdate]);
 
   const isToday = daySelected.format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD');
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800">
       {/* Day header */}
-      <div className={`p-6 border-b ${isToday ? 'bg-blue-50' : 'bg-gray-50'}`}>
-        <div className="text-sm text-gray-500 uppercase">
+      <div className={`p-6 border-b dark:border-gray-700 ${isToday ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-gray-900/50'}`}>
+        <div className="text-sm text-gray-500 dark:text-gray-400 uppercase">
           {daySelected.format('dddd')}
         </div>
         <div className="flex items-baseline gap-2 mt-2">
@@ -186,12 +292,12 @@ export const DayView = () => {
             className={`text-5xl font-bold ${
               isToday
                 ? 'bg-blue-600 text-white rounded-full w-20 h-20 flex items-center justify-center'
-                : 'text-gray-700'
+                : 'text-gray-700 dark:text-gray-200'
             }`}
           >
             {daySelected.format('DD')}
           </div>
-          <div className="text-2xl text-gray-600">
+          <div className="text-2xl text-gray-600 dark:text-gray-300">
             {daySelected.format('MMMM YYYY')}
           </div>
         </div>
@@ -201,8 +307,8 @@ export const DayView = () => {
       <div className="flex-1 overflow-y-auto scrollbar-custom">
         <div className="relative">
           {hours.map((hour) => (
-            <div key={hour} className="flex border-b min-h-20">
-              <div className="w-24 p-4 border-r text-sm text-gray-500 text-right shrink-0">
+            <div key={hour} className="flex border-b dark:border-gray-700 min-h-20">
+              <div className="w-24 p-4 border-r dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 text-right shrink-0">
                 {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
               </div>
               <div
@@ -215,45 +321,16 @@ export const DayView = () => {
 
           {/* Render events as absolutely positioned overlays */}
           <div className="absolute top-0 left-24 right-0 pointer-events-none" style={{ height: `${hours.length * 80}px` }}>
-            {eventPositions.map((pos) => {
-              const widthPercent = 100 / pos.maxColumns;
-              const leftPercent = (pos.column / pos.maxColumns) * 100;
-
-              return (
-                <div
-                  key={pos.event.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, pos.event)}
-                  onDragEnd={handleDragEnd}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEventClick(pos.event);
-                  }}
-                  className={`absolute pointer-events-auto p-2 rounded-lg border-l-4 cursor-move hover:opacity-90 transition-all shadow-sm overflow-hidden ${
-                    previewEvent?.id === pos.event.id ? 'opacity-70 ring-2 ring-blue-400' : ''
-                  }`}
-                  style={{
-                    top: `${pos.top}px`,
-                    height: `${pos.height}px`,
-                    width: `calc(${widthPercent}% - 8px)`,
-                    left: `calc(${leftPercent}% + 4px)`,
-                    backgroundColor: pos.event.color ? `${pos.event.color}33` : '#3b82f633',
-                    borderLeftColor: pos.event.color || '#3b82f6',
-                  }}
-                >
-                  <div className="font-semibold text-sm truncate">{pos.event.title}</div>
-                  {pos.event.startTime && (
-                    <div className="text-xs opacity-75 mt-0.5">
-                      {pos.event.startTime}
-                      {pos.event.endTime && ` - ${pos.event.endTime}`}
-                    </div>
-                  )}
-                  {pos.event.description && (
-                    <div className="text-xs text-gray-600 mt-1 truncate">{pos.event.description}</div>
-                  )}
-                </div>
-              );
-            })}
+            {eventPositions.map((pos) => (
+              <ResizableDayEvent
+                key={pos.event.id}
+                pos={pos}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onClick={handleEventClick}
+                onResize={handleResize}
+              />
+            ))}
           </div>
         </div>
       </div>

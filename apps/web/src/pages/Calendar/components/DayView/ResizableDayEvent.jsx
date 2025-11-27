@@ -1,0 +1,130 @@
+import React, { useState, useRef } from 'react';
+import dayjs from 'dayjs';
+
+export const ResizableDayEvent = ({
+  pos,
+  onDragStart,
+  onDragEnd,
+  onClick,
+  onResize
+}) => {
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHeight, setResizeHeight] = useState(null);
+  const cardRef = useRef(null);
+  const startHeightRef = useRef(null);
+  const currentHeightRef = useRef(null);
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    startHeightRef.current = pos.height;
+    currentHeightRef.current = pos.height;
+
+    const startY = e.clientY;
+
+    const handleMouseMove = (moveEvent) => {
+      moveEvent.preventDefault();
+      const deltaY = moveEvent.clientY - startY;
+      const newHeight = Math.max(20, startHeightRef.current + deltaY);
+      currentHeightRef.current = newHeight;
+      setResizeHeight(newHeight);
+    };
+
+    const handleMouseUp = (upEvent) => {
+      upEvent.preventDefault();
+      setIsResizing(false);
+
+      const finalHeight = currentHeightRef.current;
+
+      if (finalHeight && Math.abs(finalHeight - startHeightRef.current) > 5) {
+        const pixelsPerHour = 80;
+        const additionalMinutes = Math.round((finalHeight - startHeightRef.current) / pixelsPerHour * 60);
+
+        const originalEndTime = pos.event.endTime || '10:00';
+        const [endHours, endMinutes] = originalEndTime.split(':').map(Number);
+        const newEndTime = dayjs()
+          .hour(endHours)
+          .minute(endMinutes)
+          .add(additionalMinutes, 'minute')
+          .format('HH:mm');
+
+        onResize({
+          ...pos.event,
+          endTime: newEndTime,
+        });
+      }
+
+      setResizeHeight(null);
+      startHeightRef.current = null;
+      currentHeightRef.current = null;
+
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const widthPercent = 100 / pos.maxColumns;
+  const leftPercent = (pos.column / pos.maxColumns) * 100;
+  const displayHeight = resizeHeight !== null ? resizeHeight : pos.height;
+
+  return (
+    <div
+      ref={cardRef}
+      draggable={!isResizing}
+      onDragStart={(e) => onDragStart(e, pos.event)}
+      onDragEnd={onDragEnd}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isResizing) {
+          onClick(pos.event);
+        }
+      }}
+      className={`absolute p-2 rounded border-l-4 hover:shadow-lg transition-shadow overflow-hidden group ${
+        isResizing ? 'cursor-ns-resize' : 'cursor-move'
+      }`}
+      style={{
+        top: `${pos.top}px`,
+        height: `${displayHeight}px`,
+        width: `calc(${widthPercent}% - 8px)`,
+        left: `calc(${leftPercent}% + 4px)`,
+        backgroundColor: pos.event.color ? `${pos.event.color}33` : '#3b82f633',
+        borderLeftColor: pos.event.color || '#3b82f6',
+        pointerEvents: 'auto',
+      }}
+    >
+      <div className="font-semibold text-sm truncate">{pos.event.title}</div>
+      {pos.event.startTime && (
+        <div className="text-xs opacity-75 truncate mt-1">
+          {pos.event.startTime}
+          {pos.event.endTime && ` - ${pos.event.endTime}`}
+        </div>
+      )}
+      {pos.event.description && displayHeight > 80 && (
+        <div className="text-xs mt-2 opacity-60 line-clamp-3">
+          {pos.event.description}
+        </div>
+      )}
+
+      <div
+        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10"
+        onMouseDown={handleResizeStart}
+        onClick={(e) => e.stopPropagation()}
+        style={{ touchAction: 'none' }}
+      />
+
+      {isResizing && resizeHeight && (
+        <div className="absolute -bottom-6 left-0 right-0 text-center text-[10px] bg-blue-600 text-white rounded px-1 py-0.5 z-50">
+          {pos.event.startTime} - {dayjs().hour(0).minute(0).add(
+            pos.event.startTime ?
+            (parseInt(pos.event.startTime.split(':')[0]) * 60 + parseInt(pos.event.startTime.split(':')[1])) :
+            0, 'minute'
+          ).add(Math.round(displayHeight / 80 * 60), 'minute').format('HH:mm')}
+        </div>
+      )}
+    </div>
+  );
+};

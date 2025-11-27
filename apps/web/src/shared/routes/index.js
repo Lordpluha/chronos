@@ -6,4 +6,5 @@ export const ROUTES = {
   resetPassword: '/auth/reset-password',
   profile: '/profile',
   calendar: '/calendar',
+  reminders: '/reminders',
 }
