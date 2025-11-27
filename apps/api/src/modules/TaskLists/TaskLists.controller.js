@@ -1,204 +1,131 @@
-import { TaskList } from '../../models/TaskList.js'
-import { Task } from '../../models/Task.js'
+import { Router } from 'express'
+import { requireAccessToken } from '../../middleware/index.js'
+import { validateBody } from '../../utils/index.js'
+import { taskListsService } from './TaskLists.service.js'
+import {
+  createTaskListSchema,
+  updateTaskListSchema,
+} from './TaskLists.validation.js'
 
-// CREATE
-export const createTaskList = async (req, res) => {
-  try 
-  {
-    const { name, description } = req.body
-    const creator = req.userId
+const router = Router()
 
-    const newTaskList = new TaskList({
-      name,
-      description,
-      creator,
-      tasks: [],
-    })
-
-    await newTaskList.save()
-    await newTaskList.populate('creator', 'username email')
-
-    res.status(201).json({
-      message: 'Task list created successfully',
-      data: newTaskList,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error creating task list',
-      error: error.message,
-    })
-  }
-}
-
-// READ
-export const getAllTaskLists = async (req, res) => {
-  try 
-  {
-    const creator = req.userId
-    const { populate = false } = req.query
-
-    let query = TaskList.find({ creator }).populate('creator', 'username email')
-
-    if(populate === 'true') 
-        {
-      query = query.populate({
-        path: 'tasks',
-        options: { sort: { created: -1 } },
+// POST /task-lists - create a new task list
+router.post(
+  '/task-lists',
+  requireAccessToken,
+  validateBody(createTaskListSchema),
+  async (req, res) => {
+    try {
+      const taskList = await taskListsService.createTaskList(req.userId, req.body)
+      return res.status(201).json({
+        message: 'Task list created successfully',
+        data: taskList,
       })
+    } catch (err) {
+      console.error('❌ Error creating task list:', err)
+      return res.status(err.status || 500).json({ message: err.message })
     }
+  },
+)
 
-    const taskLists = await query.sort({ created: -1 })
-
-    res.status(200).json({
+// GET /task-lists - get all task lists
+router.get('/task-lists', requireAccessToken, async (req, res) => {
+  try {
+    const taskLists = await taskListsService.getAllTaskLists(req.userId, req.query)
+    return res.status(200).json({
       message: 'Task lists retrieved successfully',
       data: taskLists,
       count: taskLists.length,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving task lists',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting task lists:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
 
-// READ
-export const getTaskListById = async (req, res) => {
-  try 
-  {
+// GET /task-lists/:id - get task list by ID
+router.get('/task-lists/:id', requireAccessToken, async (req, res) => {
+  try {
     const { id } = req.params
-    const creator = req.userId
-
-    const taskList = await TaskList.findOne({ _id: id, creator })
-      .populate('creator', 'username email')
-      .populate({
-        path: 'tasks',
-        options: { sort: { created: -1 } },
-      })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    res.status(200).json({
+    const taskList = await taskListsService.getTaskListById(id, req.userId)
+    return res.status(200).json({
       message: 'Task list retrieved successfully',
       data: taskList,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving task list',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting task list:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
 
-// UPDATE
-export const updateTaskList = async (req, res) => {
-  try 
-  {
+// GET /task-lists/:id/statistics - get task list statistics
+router.get('/task-lists/:id/statistics', requireAccessToken, async (req, res) => {
+  try {
     const { id } = req.params
-    const { name, description } = req.body
-    const creator = req.userId
-
-    const taskList = await TaskList.findOne({ _id: id, creator })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    if(name) taskList.name = name
-    if(description !== undefined) taskList.description = description
-
-    await taskList.save()
-    await taskList.populate('creator', 'username email')
-    await taskList.populate({
-      path: 'tasks',
-      options: { sort: { created: -1 } },
-    })
-
-    res.status(200).json({
-      message: 'Task list updated successfully',
-      data: taskList,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error updating task list',
-      error: error.message,
-    })
-  }
-}
-
-// DELETE
-export const deleteTaskList = async (req, res) => {
-  try 
-  {
-    const { id } = req.params
-    const creator = req.userId
-
-    const taskList = await TaskList.findOne({ _id: id, creator })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    if(taskList.tasks && taskList.tasks.length > 0) await Task.deleteMany({ _id: { $in: taskList.tasks } })
-
-    await TaskList.deleteOne({ _id: id })
-
-    res.status(200).json({
-      message: 'Task list deleted successfully',
-      data: { id },
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error deleting task list',
-      error: error.message,
-    })
-  }
-}
-
-// GET
-export const getTaskListStatistics = async (req, res) => {
-  try 
-  {
-    const { id } = req.params
-    const creator = req.userId
-
-    const taskList = await TaskList.findOne({ _id: id, creator }).populate('tasks')
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    const now = new Date()
-    const stats = {
-      total: taskList.tasks.length,
-      completed: 0,
-      pending: 0,
-      overdue: 0,
-    }
-
-    // @ts-ignore
-    taskList.tasks.forEach((task) => {
-      // @ts-ignore
-      if(task.completed) stats.completed++
-      else 
-        {
-        stats.pending++
-        // @ts-ignore
-        if(task.end && task.end < now) stats.overdue++
-      }
-    })
-
-    res.status(200).json({
+    const stats = await taskListsService.getTaskListStatistics(id, req.userId)
+    return res.status(200).json({
       message: 'Task list statistics retrieved successfully',
-      data: {
-        taskListId: id,
-        ...stats,
-      },
+      data: stats,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving statistics',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting task list statistics:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
+
+// PATCH /task-lists/:id - update task list
+router.patch(
+  '/task-lists/:id',
+  requireAccessToken,
+  validateBody(updateTaskListSchema),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const taskList = await taskListsService.updateTaskList(id, req.userId, req.body)
+      return res.status(200).json({
+        message: 'Task list updated successfully',
+        data: taskList,
+      })
+    } catch (err) {
+      console.error('❌ Error updating task list:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PUT /task-lists/:id - update task list (alias)
+router.put(
+  '/task-lists/:id',
+  requireAccessToken,
+  validateBody(updateTaskListSchema),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+      const taskList = await taskListsService.updateTaskList(id, req.userId, req.body)
+      return res.status(200).json({
+        message: 'Task list updated successfully',
+        data: taskList,
+      })
+    } catch (err) {
+      console.error('❌ Error updating task list:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// DELETE /task-lists/:id - delete task list
+router.delete('/task-lists/:id', requireAccessToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const result = await taskListsService.deleteTaskList(id, req.userId)
+    return res.status(200).json({
+      message: 'Task list deleted successfully',
+      data: result,
+    })
+  } catch (err) {
+    console.error('❌ Error deleting task list:', err)
+    return res.status(err.status || 500).json({ message: err.message })
+  }
+})
+
+export { router as TaskListsRouter }

@@ -1,365 +1,226 @@
-import { Task } from '../../models/Task.js'
-import { TaskList } from '../../models/TaskList.js'
+import { Router } from 'express'
+import { requireAccessToken } from '../../middleware/index.js'
+import { validateBody } from '../../utils/index.js'
+import { tasksService } from './Tasks.service.js'
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  tagSchema,
+} from './Tasks.validation.js'
 
-// CREATE
-export const createTask = async (req, res) => {
-  try 
-  {
-    const { taskListId } = req.params
-    const {
-      title,
-      description,
-      priority = 'medium',
-      tags = [],
-      start,
-      end,
-      estimated_duration,
-    } = req.body
+const router = Router()
 
-    const taskList = await TaskList.findOne({
-      _id: taskListId,
-      creator: req.userId,
-    })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    const newTask = new Task({
-      title,
-      description,
-      priority,
-      tags,
-      start: start ? new Date(start) : null,
-      end: end ? new Date(end) : null,
-      estimated_duration,
-      completed: false,
-      attachments: [],
-    })
-
-    await newTask.save()
-
-    if(!taskList.tasks.includes(newTask._id)) taskList.tasks.push(newTask._id)
-
-    await taskList.save()
-
-    res.status(201).json({
-      message: 'Task created successfully',
-      data: newTask,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error creating task',
-      error: error.message,
-    })
-  }
-}
-
-export const getTasksByTaskList = async (req, res) => {
-  try 
-  {
-    const { taskListId } = req.params
-    const { sort = '-created', filter } = req.query
-
-    const taskList = await TaskList.findOne({
-      _id: taskListId,
-      creator: req.userId,
-    })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    let query = Task.find({ _id: { $in: taskList.tasks } })
-
-    if(filter === 'completed') query = query.where('completed', true)
-    else if(filter === 'pending') query = query.where('completed', false)
-
-    const tasks = await query.sort(sort)
-
-    res.status(200).json({
-      message: 'Tasks retrieved successfully',
-      data: tasks,
-      count: tasks.length,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving tasks',
-      error: error.message,
-    })
-  }
-}
-
-// READ
-export const getTaskById = async (req, res) => {
-  try 
-  {
-    const { taskId } = req.params
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    res.status(200).json({
-      message: 'Task retrieved successfully',
-      data: task,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving task',
-      error: error.message,
-    })
-  }
-}
-
-// UPDATE
-export const updateTask = async (req, res) => {
+// GET /tasks/overdue - get overdue tasks
+router.get('/tasks/overdue', requireAccessToken, async (req, res) => {
   try {
-    const { taskId } = req.params
-    const {
-      title,
-      description,
-      priority,
-      tags,
-      start,
-      end,
-      estimated_duration,
-      actual_duration,
-      completed,
-    } = req.body
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    const updates = {
-      ...(title && { title }),
-      ...(description !== undefined && { description }),
-      ...(priority && { priority }),
-      ...(tags && { tags }),
-      ...(start && { start: new Date(start) }),
-      ...(end && { end: new Date(end) }),
-      ...(estimated_duration !== undefined && { estimated_duration }),
-      ...(actual_duration !== undefined && { actual_duration }),
-      ...(completed !== undefined && { completed }),
-      updated: new Date(),
-    }
-
-    Object.assign(task, updates)
-    await task.save()
-
-    res.status(200).json({
-      message: 'Task updated successfully',
-      data: task,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error updating task',
-      error: error.message,
-    })
-  }
-}
-
-// DELETE
-export const deleteTask = async (req, res) => {
-  try 
-  {
-    const { taskListId, taskId } = req.params
-
-    const taskList = await TaskList.findOne({
-      _id: taskListId,
-      creator: req.userId,
-    })
-
-    if(!taskList) return res.status(404).json({ message: 'Task list not found' })
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    taskList.tasks = taskList.tasks.filter(
-      (task) => task.toString() !== taskId.toString()
-    )
-    await taskList.save()
-
-    await Task.deleteOne({ _id: taskId })
-
-    res.status(200).json({
-      message: 'Task deleted successfully',
-      data: { id: taskId },
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error deleting task',
-      error: error.message,
-    })
-  }
-}
-
-// PATCH
-export const toggleTaskCompletion = async (req, res) => {
-  try 
-  {
-    const { taskId } = req.params
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    task.completed = !task.completed
-    task.updated = new Date()
-    await task.save()
-
-    res.status(200).json({
-      message: 'Task completion toggled successfully',
-      data: task,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error toggling task completion',
-      error: error.message,
-    })
-  }
-}
-
-// PATCH
-export const addTagToTask = async (req, res) => {
-  try 
-  {
-    const { taskId } = req.params
-    const { tag } = req.body
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    if(!task.tags.includes(tag)) task.tags.push(tag)
-
-    await task.save()
-
-    res.status(200).json({
-      message: 'Tag added successfully',
-      data: task,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error adding tag',
-      error: error.message,
-    })
-  }
-}
-
-// PATCH
-export const removeTagFromTask = async (req, res) => {
-  try 
-  {
-    const { taskId } = req.params
-    const { tag } = req.body
-
-    const task = await Task.findById(taskId)
-
-    if(!task) return res.status(404).json({ message: 'Task not found' })
-
-    task.tags = task.tags.filter((t) => t !== tag)
-    await task.save()
-
-    res.status(200).json({
-      message: 'Tag removed successfully',
-      data: task,
-    })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error removing tag',
-      error: error.message,
-    })
-  }
-}
-
-// GET
-export const getOverdueTasks = async (req, res) => {
-  try 
-  {
-    const tasks = await Task.find({
-      completed: false,
-      end: { $lt: new Date() },
-    }).sort({ end: 1 })
-
-    res.status(200).json({
+    const tasks = await tasksService.getOverdueTasks()
+    return res.status(200).json({
       message: 'Overdue tasks retrieved successfully',
       data: tasks,
       count: tasks.length,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving overdue tasks',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting overdue tasks:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
 
-// GET
-export const getTodayTasks = async (req, res) => {
-  try 
-  {
-    const today = new Date()
-    const startOfDay = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    )
-    const endOfDay = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate() + 1,
-    )
-
-    const tasks = await Task.find({
-      completed: false,
-      end: { $gte: startOfDay, $lt: endOfDay },
-    }).sort({ end: 1 })
-
-    res.status(200).json({
-      message: 'Today\'s tasks retrieved successfully',
+// GET /tasks/today - get today's tasks
+router.get('/tasks/today', requireAccessToken, async (req, res) => {
+  try {
+    const tasks = await tasksService.getTodayTasks()
+    return res.status(200).json({
+      message: "Today's tasks retrieved successfully",
       data: tasks,
       count: tasks.length,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving today\'s tasks',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting today tasks:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
 
-// GET
-export const getUpcomingTasks = async (req, res) => {
-  try 
-  {
+// GET /tasks/upcoming - get upcoming tasks
+router.get('/tasks/upcoming', requireAccessToken, async (req, res) => {
+  try {
     const { days = 7 } = req.query
-    const now = new Date()
-    const future = new Date(now.getTime() + parseInt(days) * 24 * 60 * 60 * 1000)
-
-    const tasks = await Task.find({
-      completed: false,
-      end: { $gte: now, $lte: future },
-    }).sort({ end: 1 })
-
-    res.status(200).json({
+    const tasks = await tasksService.getUpcomingTasks(days)
+    return res.status(200).json({
       message: 'Upcoming tasks retrieved successfully',
       data: tasks,
       count: tasks.length,
     })
-  } catch (error) 
-  {
-    res.status(500).json({
-      message: 'Error retrieving upcoming tasks',
-      error: error.message,
-    })
+  } catch (err) {
+    console.error('❌ Error getting upcoming tasks:', err)
+    return res.status(err.status || 500).json({ message: err.message })
   }
-}
+})
+
+// POST /tasks/:taskListId - create a new task
+router.post(
+  '/tasks/:taskListId',
+  requireAccessToken,
+  validateBody(createTaskSchema),
+  async (req, res) => {
+    try {
+      const { taskListId } = req.params
+      const task = await tasksService.createTask(req.userId, taskListId, req.body)
+      return res.status(201).json({
+        message: 'Task created successfully',
+        data: task,
+      })
+    } catch (err) {
+      console.error('❌ Error creating task:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// GET /tasks/:taskListId - get tasks by task list
+router.get('/tasks/:taskListId', requireAccessToken, async (req, res) => {
+  try {
+    const { taskListId } = req.params
+    const tasks = await tasksService.getTasksByTaskList(
+      req.userId,
+      taskListId,
+      req.query,
+    )
+    return res.status(200).json({
+      message: 'Tasks retrieved successfully',
+      data: tasks,
+      count: tasks.length,
+    })
+  } catch (err) {
+    console.error('❌ Error getting tasks:', err)
+    return res.status(err.status || 500).json({ message: err.message })
+  }
+})
+
+// GET /tasks/:taskListId/:taskId - get task by ID
+router.get('/tasks/:taskListId/:taskId', requireAccessToken, async (req, res) => {
+  try {
+    const { taskId } = req.params
+    const task = await tasksService.getTaskById(taskId)
+    return res.status(200).json({
+      message: 'Task retrieved successfully',
+      data: task,
+    })
+  } catch (err) {
+    console.error('❌ Error getting task:', err)
+    return res.status(err.status || 500).json({ message: err.message })
+  }
+})
+
+// PATCH /tasks/:taskListId/:taskId - update task
+router.patch(
+  '/tasks/:taskListId/:taskId',
+  requireAccessToken,
+  validateBody(updateTaskSchema),
+  async (req, res) => {
+    try {
+      const { taskId } = req.params
+      const task = await tasksService.updateTask(taskId, req.body)
+      return res.status(200).json({
+        message: 'Task updated successfully',
+        data: task,
+      })
+    } catch (err) {
+      console.error('❌ Error updating task:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PUT /tasks/:taskListId/:taskId - update task (alias)
+router.put(
+  '/tasks/:taskListId/:taskId',
+  requireAccessToken,
+  validateBody(updateTaskSchema),
+  async (req, res) => {
+    try {
+      const { taskId } = req.params
+      const task = await tasksService.updateTask(taskId, req.body)
+      return res.status(200).json({
+        message: 'Task updated successfully',
+        data: task,
+      })
+    } catch (err) {
+      console.error('❌ Error updating task:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PATCH /tasks/:taskListId/:taskId/toggle - toggle task completion
+router.patch('/tasks/:taskListId/:taskId/toggle', requireAccessToken, async (req, res) => {
+  try {
+    const { taskId } = req.params
+    const task = await tasksService.toggleTaskCompletion(taskId)
+    return res.status(200).json({
+      message: 'Task completion toggled successfully',
+      data: task,
+    })
+  } catch (err) {
+    console.error('❌ Error toggling task completion:', err)
+    return res.status(err.status || 500).json({ message: err.message })
+  }
+})
+
+// PATCH /tasks/:taskListId/:taskId/tags/add - add tag to task
+router.patch(
+  '/tasks/:taskListId/:taskId/tags/add',
+  requireAccessToken,
+  validateBody(tagSchema),
+  async (req, res) => {
+    try {
+      const { taskId } = req.params
+      const { tag } = req.body
+      const task = await tasksService.addTagToTask(taskId, tag)
+      return res.status(200).json({
+        message: 'Tag added successfully',
+        data: task,
+      })
+    } catch (err) {
+      console.error('❌ Error adding tag:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PATCH /tasks/:taskListId/:taskId/tags/remove - remove tag from task
+router.patch(
+  '/tasks/:taskListId/:taskId/tags/remove',
+  requireAccessToken,
+  validateBody(tagSchema),
+  async (req, res) => {
+    try {
+      const { taskId } = req.params
+      const { tag } = req.body
+      const task = await tasksService.removeTagFromTask(taskId, tag)
+      return res.status(200).json({
+        message: 'Tag removed successfully',
+        data: task,
+      })
+    } catch (err) {
+      console.error('❌ Error removing tag:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// DELETE /tasks/:taskListId/:taskId - delete task
+router.delete('/tasks/:taskListId/:taskId', requireAccessToken, async (req, res) => {
+  try {
+    const { taskListId, taskId } = req.params
+    const result = await tasksService.deleteTask(req.userId, taskListId, taskId)
+    return res.status(200).json({
+      message: 'Task deleted successfully',
+      data: result,
+    })
+  } catch (err) {
+    console.error('❌ Error deleting task:', err)
+    return res.status(err.status || 500).json({ message: err.message })
+  }
+})
+
+export { router as TasksRouter }
