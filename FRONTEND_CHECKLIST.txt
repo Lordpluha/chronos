@@ -328,40 +328,58 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
 
 
 ================================================================================
-🟡 ПРИОРИТЕТ 5: НАСТРОЙКИ И ЛОКАЛИЗАЦИЯ (СРЕДНИЙ)
+🟡 ПРИОРИТЕТ 5: ACCOUNT PAGE И НАСТРОЙКИ (СРЕДНИЙ)
 ================================================================================
 
-[ ] 6.1. Страница Settings
-    [ ] src/pages/Settings/ui/SettingsPage.jsx
-    [ ] Роут /settings
-    [ ] Табы: Account, Notifications, Calendars, Integrations
+PLAN: Создать единую страницу /account с интегрированными настройками
+      Добавить возможность загрузки аватара
+      Объединить Settings и Profile в один интерфейс
 
-[ ] 6.2. Account Settings
+[ ] 6.1. Account Page
+    [ ] src/pages/Account/ui/AccountPage.jsx
+    [ ] Роут /account (заменяет /profile)
+    [ ] Табы: Profile, Notifications, Calendars, Appearance
+    [ ] Заменить кнопку Profile в Header на Account
+
+[ ] 6.2. Profile Tab
+    [ ] Загрузка аватара (upload + crop)
+    [ ] src/features/Account/UploadAvatar/
     [ ] Изменение имени, email
-    [ ] Смена пароля
-    [ ] Timezone выбор
-    [ ] Locale (ru/en)
-    [ ] Загрузка аватара
+    [ ] Смена пароля (modal)
+    [ ] Timezone выбор (default для событий)
+    [ ] 2FA управление (вкл/выкл)
+    [ ] Удаление аккаунта (с подтверждением)
 
-[ ] 6.3. Notification Settings
+[ ] 6.3. Notifications Tab
     [ ] Email уведомления (вкл/выкл)
     [ ] Push уведомления (вкл/выкл)
-    [ ] Default reminder offset (за сколько минут)
-    [ ] Частота дайджестов
+    [ ] Default reminder offset (5/10/15/30 минут)
+    [ ] Reminder snackbar position (top-right/bottom-right)
+    [ ] Sound notifications (вкл/выкл)
 
-[ ] 6.4. Интернационализация (i18n)
-    [ ] Установить react-i18next
-    [ ] src/shared/i18n/ru.json
-    [ ] src/shared/i18n/en.json
-    [ ] Перевести все тексты UI
-    [ ] Локализация дат через date-fns locales
-    [ ] Переключатель языка в Settings
+[ ] 6.4. Calendars Tab
+    [ ] Список всех календарей пользователя
+    [ ] Default calendar выбор
+    [ ] Цвета календарей (picker)
+    [ ] Удаление календарей
+    [ ] Export calendar (.ics)
 
-[ ] 6.5. Темная тема
-    [ ] next-themes уже установлен
-    [ ] Настроить dark mode
-    [ ] Переключатель в Settings или Header
-    [ ] Сохранение предпочтения
+[ ] 6.5. Appearance Tab
+    [x] Dark theme toggle (уже работает через next-themes)
+    [ ] Calendar start day (Monday/Sunday)
+    [ ] Week numbers display (on/off)
+    [ ] Compact/Normal/Comfortable view density
+    [ ] Custom theme colors (advanced)
+
+[ ] 6.6. Avatar Upload Feature
+    [ ] src/features/Account/UploadAvatar/UploadAvatar.jsx
+    [ ] Drag & drop или file input
+    [ ] Image crop modal (react-image-crop или react-easy-crop)
+    [ ] Preview перед сохранением
+    [ ] Backend endpoint: POST /api/users/avatar
+    [ ] Cloudinary/S3 для хранения (или local storage)
+    [ ] Оптимизация изображения (max 500x500px, JPEG/PNG)
+    [ ] Удаление аватара (вернуть к default)
 
 
 ================================================================================
@@ -388,19 +406,28 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [ ] Импорт событий из Google
     [ ] Двусторонняя синхронизация (опционально)
 
-[x] 7.5. Tasks (задачи)
+[x] 7.5. Tasks (задачи) - COMPLETED ✅
     [x] src/features/Tasks/
     [x] Отдельный функционал задач
     [x] Done кнопка для выполнения
     [x] Дедлайн (end date)
     [x] Приоритет (low/medium/high/urgent) с цветовой индикацией
-    [ ] Подзадачи (subtasks)
+    [x] Подзадачи (subtasks) с чекбоксами
+    [x] Subtask progress indicator (N/M)
+    [x] Live update subtasks через API
+    [x] Tags с визуальными badges
+    [x] Dark theme support
 
-[x] 7.6. TaskList (списки задач)
+[x] 7.6. TaskList (списки задач) - COMPLETED ✅
     [x] Группировка задач в списки
     [x] CRUD списков задач
     [x] Перемещение задач между списками
     [x] Отображение задач с датами в календаре
+    [x] Sidebar с переключением списков
+    [x] Statistics по задачам
+    [x] Filter: pending/completed/all
+    [x] Search по названию задач
+    [x] Tag filtering
 
 [ ] 7.7. Attachments (файлы)
     [ ] Прикрепление файлов к событиям
