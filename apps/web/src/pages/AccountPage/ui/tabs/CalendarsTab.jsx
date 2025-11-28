@@ -1,0 +1,163 @@
+import { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/ui/card';
+import { Button } from '@shared/ui/button';
+import { Badge } from '@shared/ui/badge';
+import { useCalendars } from '@shared/hooks/useCalendars';
+import { Calendar, Download, Trash2, Star } from 'lucide-react';
+import { toast } from 'sonner';
+
+export function CalendarsTab() {
+  const { data: calendarsData, isLoading } = useCalendars();
+  const calendars = calendarsData?.data || [];
+
+  const handleSetDefault = (calendarId) => {
+    // TODO: Implement set default calendar API call
+    toast.success('Default calendar updated');
+  };
+
+  const handleExport = (calendar) => {
+    // TODO: Implement .ics export
+    toast.success(`Exporting ${calendar.title}...`);
+  };
+
+  const handleDelete = (calendarId) => {
+    // TODO: Implement delete calendar with confirmation
+    if (confirm('Are you sure you want to delete this calendar?')) {
+      toast.success('Calendar deleted');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-gray-500">Loading calendars...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Calendars</CardTitle>
+          <CardDescription>
+            Manage your calendars and set default preferences
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {calendars.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No calendars found</p>
+            </div>
+          ) : (
+            calendars.map((calendar) => (
+              <div
+                key={calendar._id}
+                className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors"
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div
+                    className="h-10 w-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: calendar.color || '#3b82f6' }}
+                  >
+                    <Calendar className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-gray-900 dark:text-white">
+                        {calendar.title}
+                      </h3>
+                      {calendar.is_default && (
+                        <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                          <Star className="h-3 w-3 mr-1" />
+                          Default
+                        </Badge>
+                      )}
+                    </div>
+                    {calendar.description && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        {calendar.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <span>{calendar.events?.length || 0} events</span>
+                      <span className="capitalize">{calendar.visibility}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!calendar.is_default && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSetDefault(calendar._id)}
+                      className="text-gray-600 hover:text-indigo-600"
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleExport(calendar)}
+                    className="text-gray-600 hover:text-blue-600"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(calendar._id)}
+                    className="text-gray-600 hover:text-red-600"
+                    disabled={calendar.is_default}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Import / Export</CardTitle>
+          <CardDescription>
+            Backup or transfer your calendar data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Export all calendars</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Download all your calendars in .ics format
+              </p>
+            </div>
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export All
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              <p className="font-medium">Import calendar</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Import events from .ics file
+              </p>
+            </div>
+            <Button variant="outline">
+              Import .ics
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}

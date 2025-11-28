@@ -4,6 +4,7 @@ import { Registration } from '@pages/Registration'
 import { ForgotPassword } from '@pages/ForgotPassword'
 import { ResetPassword } from '@pages/ResetPassword'
 import { ProfilePage } from '@pages/Profile'
+import { AccountPage } from '@pages/AccountPage'
 import { CalendarPage } from '@pages/Calendar'
 import { RemindersPage } from '@pages/RemindersPage'
 import { TasksPage } from '@pages/TasksPage'
@@ -53,6 +54,14 @@ export const router = createBrowserRouter([
     element: (
       <PrivateRoute>
         <ProfilePage />
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: ROUTES.account,
+    element: (
+      <PrivateRoute>
+        <AccountPage />
       </PrivateRoute>
     ),
   },

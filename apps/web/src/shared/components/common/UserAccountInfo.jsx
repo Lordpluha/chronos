@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '@shared/context/AuthContext';
 import { useNavigate } from 'react-router';
 import { Button } from '@shared/ui/button';
+import { ROUTES } from '@shared/routes';
 import toast from 'react-hot-toast';
 
 export default function UserAccountInfo() {
@@ -18,11 +19,18 @@ export default function UserAccountInfo() {
     }
   };
 
+  const handleAccountClick = () => {
+    navigate(ROUTES.account);
+  };
+
   if (!user) return null;
 
   return (
     <div className="flex items-center gap-4">
-      <div className="flex items-center gap-3">
+      <div 
+        className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={handleAccountClick}
+      >
         <div className="text-right">
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {user.full_name}
