@@ -5,6 +5,7 @@ import { useEvents, useCreateEvent, useUpdateEvent, useDeleteEvent, useCalendars
 import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
 import { useReminders, useReminderNotifications } from "@features/Reminders";
+import { useTasksWithDates } from "@features/Tasks/hooks";
 
 export const CalendarContextWrapper = (props) => {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -19,9 +20,18 @@ export const CalendarContextWrapper = (props) => {
 
   const { data: calendarsData, isLoading: isLoadingCalendars } = useCalendars({ enabled: isAuthenticated });
   const { data: eventsData, isLoading, error } = useEvents({ enabled: isAuthenticated });
-  const { reminders, loading: loadingReminders } = useReminders();
+  const { reminders, loading: loadingReminders, fetchReminders } = useReminders();
+  const { data: tasksData = [] } = useTasksWithDates();
 
   useReminderNotifications(reminders);
+
+  // Fetch reminders when authentication state changes
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      console.log('🔄 Fetching reminders after auth...');
+      fetchReminders();
+    }
+  }, [isAuthenticated, authLoading, fetchReminders]);
 
   const createEventMutation = useCreateEvent();
   const updateEventMutation = useUpdateEvent();
@@ -131,9 +141,37 @@ export const CalendarContextWrapper = (props) => {
     });
   }, [reminders, calendars]);
 
+  const taskEvents = useMemo(() => {
+    if (!tasksData || tasksData.length === 0) return [];
+
+    return tasksData.map(task => {
+      const taskDate = dayjs(task.end);
+      const priorityColors = {
+        low: '#6b7280',
+        medium: '#3b82f6',
+        high: '#f97316',
+        urgent: '#ef4444',
+      };
+
+      return {
+        id: `task-${task._id}`,
+        title: `✓ ${task.title}`,
+        description: task.description || '',
+        day: taskDate.startOf('day').valueOf(),
+        startTime: '09:00',
+        endTime: '09:30',
+        calendarId: 'tasks',
+        color: priorityColors[task.priority || 'medium'],
+        isTask: true,
+        taskId: task._id,
+        priority: task.priority,
+      };
+    });
+  }, [tasksData]);
+
   const allEvents = useMemo(() => {
-    return [...savedEvents, ...reminderEvents];
-  }, [savedEvents, reminderEvents]);
+    return [...savedEvents, ...reminderEvents, ...taskEvents];
+  }, [savedEvents, reminderEvents, taskEvents]);
 
   // Dispatch function to handle CRUD operations
   const dispatchCalEvent = ({ type, payload }) => {
@@ -205,7 +243,7 @@ export const CalendarContextWrapper = (props) => {
   // Filter events by visible calendars
   const filteredEvents = useMemo(() => {
     return allEvents.filter((evt) =>
-      visibleCalendarIds.includes(evt.calendarId)
+      visibleCalendarIds.includes(evt.calendarId) || evt.calendarId === 'tasks'
     );
   }, [allEvents, visibleCalendarIds]);
 

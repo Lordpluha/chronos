@@ -6,6 +6,7 @@ import { ResetPassword } from '@pages/ResetPassword'
 import { ProfilePage } from '@pages/Profile'
 import { CalendarPage } from '@pages/Calendar'
 import { RemindersPage } from '@pages/RemindersPage'
+import { TasksPage } from '@pages/TasksPage'
 import { ROUTES } from '@shared/routes'
 import { GuestRoute, PrivateRoute } from '@shared/components/ProtectedRoute'
 import { createBrowserRouter } from 'react-router'
@@ -68,6 +69,14 @@ export const router = createBrowserRouter([
     element: (
       <PrivateRoute>
         <RemindersPage />
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: ROUTES.tasks,
+    element: (
+      <PrivateRoute>
+        <TasksPage />
       </PrivateRoute>
     ),
   },

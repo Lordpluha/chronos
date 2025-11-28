@@ -71,21 +71,24 @@ export const ResizableWeekEvent = ({
   const widthPercent = 100 / pos.maxColumns;
   const leftPercent = (pos.column / pos.maxColumns) * 100;
   const displayHeight = resizeHeight !== null ? resizeHeight : pos.height;
+  const isReadOnly = pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks';
 
   return (
     <div
       ref={cardRef}
-      draggable={!isResizing}
+      draggable={!isResizing && !isReadOnly}
       onDragStart={(e) => onDragStart(e, pos.event)}
       onDragEnd={onDragEnd}
       onClick={(e) => {
         e.stopPropagation();
-        if (!isResizing) {
+        if (!isResizing && !isReadOnly) {
           onClick(pos.event, day);
         }
       }}
-      className={`absolute pointer-events-auto p-1.5 rounded border-l-4 hover:opacity-90 transition-opacity shadow-sm overflow-hidden group ${
-        isResizing ? 'cursor-ns-resize' : 'cursor-move'
+      className={`absolute pointer-events-auto p-1.5 rounded border-l-4 ${
+        isReadOnly ? '' : 'hover:opacity-90'
+      } transition-opacity shadow-sm overflow-hidden group ${
+        isResizing ? 'cursor-ns-resize' : isReadOnly ? 'cursor-default' : 'cursor-move'
       }`}
       style={{
         top: `${pos.top}px`,
@@ -103,9 +106,16 @@ export const ResizableWeekEvent = ({
           {pos.event.endTime && ` - ${pos.event.endTime}`}
         </div>
       )}
+      {pos.event.subtasks && pos.event.subtasks.length > 0 && (
+        <div className="text-[10px] opacity-75 mt-0.5">
+          ✓ {pos.event.subtasks.filter(st => st.completed).length}/{pos.event.subtasks.length}
+        </div>
+      )}
 
       <div
-        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10"
+        className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10 ${
+          pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks' ? 'hidden' : ''
+        }`}
         onMouseDown={handleResizeStart}
         onClick={(e) => e.stopPropagation()}
         style={{ touchAction: 'none' }}

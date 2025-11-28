@@ -127,6 +127,10 @@ export const Week = () => {
   };
 
   const handleEventClick = (evt, day) => {
+    // Запрещаем редактирование напоминаний и задач через календарь
+    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+      return;
+    }
     setDaySelected(day);
     setSelectedEvent(evt);
     setShowEventModal(true);
@@ -134,6 +138,11 @@ export const Week = () => {
 
   // Drag handlers
   const handleDragStart = (e, evt) => {
+    // Запрещаем перетаскивание напоминаний и задач
+    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+      e.preventDefault();
+      return;
+    }
     setDraggedEvent(evt);
     e.dataTransfer.effectAllowed = 'move';
   };

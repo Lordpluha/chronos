@@ -70,21 +70,24 @@ export const ResizableDayEvent = ({
   const widthPercent = 100 / pos.maxColumns;
   const leftPercent = (pos.column / pos.maxColumns) * 100;
   const displayHeight = resizeHeight !== null ? resizeHeight : pos.height;
+  const isReadOnly = pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks';
 
   return (
     <div
       ref={cardRef}
-      draggable={!isResizing}
+      draggable={!isResizing && !isReadOnly}
       onDragStart={(e) => onDragStart(e, pos.event)}
       onDragEnd={onDragEnd}
       onClick={(e) => {
         e.stopPropagation();
-        if (!isResizing) {
+        if (!isResizing && !isReadOnly) {
           onClick(pos.event);
         }
       }}
-      className={`absolute p-2 rounded border-l-4 hover:shadow-lg transition-shadow overflow-hidden group ${
-        isResizing ? 'cursor-ns-resize' : 'cursor-move'
+      className={`absolute p-2 rounded border-l-4 ${
+        isReadOnly ? '' : 'hover:shadow-lg'
+      } transition-shadow overflow-hidden group ${
+        isResizing ? 'cursor-ns-resize' : isReadOnly ? 'cursor-default' : 'cursor-move'
       }`}
       style={{
         top: `${pos.top}px`,
@@ -103,6 +106,11 @@ export const ResizableDayEvent = ({
           {pos.event.endTime && ` - ${pos.event.endTime}`}
         </div>
       )}
+      {pos.event.subtasks && pos.event.subtasks.length > 0 && (
+        <div className="text-xs opacity-75 mt-1">
+          ✓ {pos.event.subtasks.filter(st => st.completed).length}/{pos.event.subtasks.length}
+        </div>
+      )}
       {pos.event.description && displayHeight > 80 && (
         <div className="text-xs mt-2 opacity-60 line-clamp-3">
           {pos.event.description}
@@ -110,7 +118,9 @@ export const ResizableDayEvent = ({
       )}
 
       <div
-        className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10"
+        className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10 ${
+          isReadOnly ? 'hidden' : ''
+        }`}
         onMouseDown={handleResizeStart}
         onClick={(e) => e.stopPropagation()}
         style={{ touchAction: 'none' }}

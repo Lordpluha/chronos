@@ -45,11 +45,19 @@ export default function Day({ day }) {
             key={idx}
             onClick={(e) => {
               e.stopPropagation();
+              // Запрещаем редактирование напоминаний и задач через календарь
+              if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+                return;
+              }
               setDaySelected(day);
               setSelectedEvent(evt);
               setShowEventModal(true);
             }}
-            className="p-1 mr-3 text-gray-700 dark:text-gray-200 text-xs rounded mb-1 truncate cursor-pointer hover:opacity-80 transition-opacity"
+            className={`p-1 mr-3 text-gray-700 dark:text-gray-200 text-xs rounded mb-1 truncate ${
+              evt.calendarId === 'reminders' || evt.calendarId === 'tasks'
+                ? 'cursor-default'
+                : 'cursor-pointer hover:opacity-80'
+            } transition-opacity`}
             style={{
               backgroundColor: evt.color ? `${evt.color}33` : '#3b82f633',
               borderLeft: `4px solid ${evt.color || '#3b82f6'}`
@@ -60,6 +68,11 @@ export default function Day({ day }) {
               <div className="text-[10px] opacity-75">
                 {evt.startTime}
                 {evt.endTime && ` - ${evt.endTime}`}
+              </div>
+            )}
+            {evt.subtasks && evt.subtasks.length > 0 && (
+              <div className="text-[10px] opacity-75 mt-0.5">
+                ✓ {evt.subtasks.filter(st => st.completed).length}/{evt.subtasks.length}
               </div>
             )}
           </div>

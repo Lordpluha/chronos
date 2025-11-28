@@ -34,6 +34,25 @@ const attachmentSchema = new mongoose.Schema(
 )
 
 /**
+ * @type {mongoose.Schema}
+ */
+const subtaskSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200,
+    },
+    completed: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  { _id: true },
+)
+
+/**
  * @type {mongoose.Schema<import('./Task').ITask, import('./Task').ITaskModel, import('./Task').ITaskMethods>}
  */
 const taskSchema = new mongoose.Schema(
@@ -69,6 +88,7 @@ const taskSchema = new mongoose.Schema(
         index: true,
       },
     ],
+    subtasks: [subtaskSchema],
     estimated_duration: {
       type: Number, // in minutes
       min: 0,

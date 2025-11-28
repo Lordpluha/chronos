@@ -115,11 +115,20 @@ export const DayView = () => {
   const eventPositions = useMemo(() => calculateEventPositions(), [eventsForDay]);
 
   const handleEventClick = (evt) => {
+    // Запрещаем редактирование напоминаний и задач через календарь
+    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+      return;
+    }
     setSelectedEvent(evt);
     setShowEventModal(true);
   };
 
   const handleDragStart = (e, evt) => {
+    // Запрещаем перетаскивание напоминаний и задач
+    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+      e.preventDefault();
+      return;
+    }
     setDraggedEvent(evt);
     e.dataTransfer.effectAllowed = 'move';
   };
