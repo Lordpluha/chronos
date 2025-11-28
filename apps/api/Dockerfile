@@ -10,7 +10,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 RUN npm install -g turbo
 COPY . .
-RUN turbo prune api --docker
+RUN turbo prune chronos-api --docker
 
 # Add lockfile and package.json's of isolated subworkspace
 FROM base AS installer
