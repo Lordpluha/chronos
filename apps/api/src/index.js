@@ -54,9 +54,6 @@ async function startServer() {
 
     app.listen(AppConfig.PORT, () => {
       console.log(`🚀 Server is running on port ${AppConfig.PORT}`)
-      console.log(
-        `📊 Health check: http://localhost:${AppConfig.PORT}/api/health`,
-      )
     })
   } catch (error) {
     console.error('❌ Failed to start server:', error)
