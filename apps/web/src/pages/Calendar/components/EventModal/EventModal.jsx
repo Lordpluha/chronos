@@ -149,7 +149,7 @@ export const EventModal = () => {
         }}
       >
         <DialogHeader
-          className="px-6 py-4 border-b bg-gray-50/50 flex flex-row items-center justify-between space-y-0"
+          className="px-6 py-4 border-b bg-gray-50 dark:bg-gray-800 flex flex-row items-center justify-between space-y-0"
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2" data-draggable="true">
@@ -158,16 +158,6 @@ export const EventModal = () => {
               {selectedEvent ? "Edit Event" : "Create Event"}
             </DialogTitle>
           </div>
-          {selectedEvent && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
@@ -274,6 +264,17 @@ export const EventModal = () => {
           </div>
 
           <DialogFooter className="pt-4">
+            {selectedEvent && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                className="mr-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
