@@ -70,7 +70,7 @@ export const ResizableDayEvent = ({
   const widthPercent = 100 / pos.maxColumns;
   const leftPercent = (pos.column / pos.maxColumns) * 100;
   const displayHeight = resizeHeight !== null ? resizeHeight : pos.height;
-  const isReadOnly = pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks';
+  const isReadOnly = pos.event.isReminder || pos.event.calendarId === 'tasks';
 
   return (
     <div

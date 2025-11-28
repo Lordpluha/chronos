@@ -48,12 +48,12 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="flex flex-col bg-gray-50 dark:bg-gray-900" style={{ height: '100dvh', maxHeight: '100dvh' }}>
       {showEventModal && <EventModal/>}
       <CalendarHeader />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-h-0">
         <Sidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {viewMode === 'day' && <DayView />}
           {viewMode === 'week' && <Week />}
           {viewMode === 'month' && (

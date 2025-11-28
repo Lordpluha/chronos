@@ -163,7 +163,7 @@ class AuthService {
     }
 
     const code = generateCode()
-    console.log(code)
+
 
     try {
       await EmailUtils.sendEmail({

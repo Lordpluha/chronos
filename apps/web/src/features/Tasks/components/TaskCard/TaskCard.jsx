@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
 } from "@shared/ui/dropdown-menu";
 import dayjs from 'dayjs';
+import { useUpdateTask } from '../../hooks/useTasks';
 
 const priorityColors = {
   low: 'bg-gray-500',
@@ -24,8 +25,9 @@ const priorityLabels = {
   urgent: 'Urgent',
 };
 
-export const TaskCard = ({ task, onToggle, onEdit, onDelete }) => {
+export const TaskCard = ({ task, onToggle, onEdit, onDelete, taskListId }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const updateTask = useUpdateTask();
 
   const isOverdue = task.end && !task.completed && dayjs(task.end).isBefore(dayjs());
   const isDueToday = task.end && dayjs(task.end).format('YYYY-MM-DD') === dayjs().format('YYYY-MM-DD');
@@ -90,22 +92,47 @@ export const TaskCard = ({ task, onToggle, onEdit, onDelete }) => {
           )}
 
           {task.subtasks && task.subtasks.length > 0 && showDetails && (
-            <div className="mt-3 space-y-1">
+            <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
               {task.subtasks.map((subtask, index) => (
-                <div key={index} className="flex items-center gap-2 text-sm">
-                  <div className={`h-1.5 w-1.5 rounded-full ${subtask.completed ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                  <span className={subtask.completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}>
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={subtask.completed}
+                    onChange={(e) => {
+                      const updatedSubtasks = task.subtasks.map((st, i) =>
+                        i === index ? { ...st, completed: !st.completed } : st
+                      );
+                      updateTask.mutate({
+                        taskListId,
+                        taskId: task._id,
+                        data: { subtasks: updatedSubtasks }
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <span className={`text-sm ${subtask.completed ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>
                     {subtask.title}
                   </span>
                 </div>
               ))}
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 pl-6">
                 {task.subtasks.filter(st => st.completed).length} / {task.subtasks.length} completed
               </div>
             </div>
           )}
 
           <div className="flex items-center gap-4 mt-2 text-xs flex-wrap">
+            {task.subtasks && task.subtasks.length > 0 && !showDetails && (
+              <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="2" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <rect x="2" y="10" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M8 4H14M8 12H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span>{task.subtasks.filter(st => st.completed).length}/{task.subtasks.length}</span>
+              </div>
+            )}
+
             {task.end && (
               <div
                 className={`flex items-center gap-1 ${

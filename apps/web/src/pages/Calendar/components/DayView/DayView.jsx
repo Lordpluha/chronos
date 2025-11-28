@@ -116,7 +116,7 @@ export const DayView = () => {
 
   const handleEventClick = (evt) => {
     // Запрещаем редактирование напоминаний и задач через календарь
-    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+    if (evt.isReminder || evt.calendarId === 'tasks') {
       return;
     }
     setSelectedEvent(evt);
@@ -125,7 +125,7 @@ export const DayView = () => {
 
   const handleDragStart = (e, evt) => {
     // Запрещаем перетаскивание напоминаний и задач
-    if (evt.calendarId === 'reminders' || evt.calendarId === 'tasks') {
+    if (evt.isReminder || evt.calendarId === 'tasks') {
       e.preventDefault();
       return;
     }

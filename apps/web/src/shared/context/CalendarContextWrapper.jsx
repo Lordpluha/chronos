@@ -21,7 +21,7 @@ export const CalendarContextWrapper = (props) => {
   const { data: calendarsData, isLoading: isLoadingCalendars } = useCalendars({ enabled: isAuthenticated });
   const { data: eventsData, isLoading, error } = useEvents({ enabled: isAuthenticated });
   const { reminders, loading: loadingReminders, fetchReminders } = useReminders();
-  const { data: tasksData = [] } = useTasksWithDates();
+  const { data: tasksData = [] } = useTasksWithDates({ enabled: isAuthenticated });
 
   useReminderNotifications(reminders);
 

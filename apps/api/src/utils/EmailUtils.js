@@ -8,7 +8,7 @@ export class EmailUtilsClass {
         ...props,
       })
       .then((onsuccess) => {
-        console.log('Message sent: %s', onsuccess.messageId)
+
       })
   }
 

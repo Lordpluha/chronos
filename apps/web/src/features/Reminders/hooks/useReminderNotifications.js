@@ -29,7 +29,7 @@ export const useReminderNotifications = (reminders) => {
     }
   };
 
-  const handleDone = async (reminder) => {
+  const handleComplete = async (reminder) => {
     try {
       await RemindersApi.updateReminder(reminder._id, {
         completed: true,
@@ -40,9 +40,11 @@ export const useReminderNotifications = (reminders) => {
       notifiedRef.current.delete(`${reminder._id}-now`);
 
       queryClient.invalidateQueries({ queryKey: ['reminders'] });
-
-      toast.success('Reminder completed ✓');
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['reminders'] });
+      }, 100);
     } catch (error) {
+      console.error('Failed to complete reminder:', error);
       toast.error('Failed to complete reminder');
     }
   };
@@ -75,9 +77,9 @@ export const useReminderNotifications = (reminders) => {
             description: reminder.description || 'Time for your reminder!',
             duration: 30000,
             action: {
-              label: '✓ Done',
+              label: 'OK',
               onClick: () => {
-                handleDone(reminder);
+                handleComplete(reminder);
                 toast.dismiss(toastId);
               },
             },

@@ -129,13 +129,13 @@ export const TasksPage = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen max-h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
       <TaskListSidebar
         selectedListId={selectedListId}
         onSelectList={setSelectedListId}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
@@ -245,6 +245,7 @@ export const TasksPage = () => {
                     <TaskCard
                       key={task._id}
                       task={task}
+                      taskListId={selectedListId}
                       onToggle={() => handleToggle(task._id)}
                       onEdit={() => openEditForm(task)}
                       onDelete={() => handleDelete(task._id)}
@@ -262,6 +263,7 @@ export const TasksPage = () => {
                     <TaskCard
                       key={task._id}
                       task={task}
+                      taskListId={selectedListId}
                       onToggle={() => handleToggle(task._id)}
                       onEdit={() => openEditForm(task)}
                       onDelete={() => handleDelete(task._id)}

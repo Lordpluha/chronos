@@ -74,7 +74,7 @@ export const ReminderForm = ({
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-2">
-        <label htmlFor="title" className="text-sm font-semibold text-gray-700">
+        <label htmlFor="title" className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           Title <span className="text-red-500">*</span>
         </label>
         <input
@@ -84,8 +84,8 @@ export const ReminderForm = ({
           value={formData.title}
           onChange={handleChange}
           placeholder="e.g. Call doctor"
-          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-text ${
-            errors.title ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-indigo-500'
+          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-text ${
+            errors.title ? 'border-red-500 focus:border-red-500' : 'border-gray-200 dark:border-gray-600 focus:border-indigo-500'
           }`}
           maxLength={300}
         />
@@ -93,7 +93,7 @@ export const ReminderForm = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="description" className="text-sm font-semibold text-gray-700">
+        <label htmlFor="description" className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           Description
         </label>
         <textarea
@@ -102,14 +102,14 @@ export const ReminderForm = ({
           value={formData.description}
           onChange={handleChange}
           placeholder="Additional information..."
-          className="px-3 py-2.5 border-2 border-gray-200 rounded-lg text-sm text-gray-900 transition-all focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-y min-h-20 cursor-text"
+          className="px-3 py-2.5 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-700 transition-all focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 resize-y min-h-20 cursor-text"
           rows={3}
           maxLength={1000}
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="calendar" className="text-sm font-semibold text-gray-700">
+        <label htmlFor="calendar" className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           Calendar <span className="text-red-500">*</span>
         </label>
         <select
@@ -117,8 +117,8 @@ export const ReminderForm = ({
           name="calendar"
           value={formData.calendar}
           onChange={handleChange}
-          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer ${
-            errors.calendar ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-indigo-500'
+          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer ${
+            errors.calendar ? 'border-red-500 focus:border-red-500' : 'border-gray-200 dark:border-gray-600 focus:border-indigo-500'
           }`}
         >
           <option value="">Select calendar</option>
@@ -132,7 +132,7 @@ export const ReminderForm = ({
       </div>
 
       <div className="flex flex-col gap-2">
-        <label htmlFor="start" className="text-sm font-semibold text-gray-700">
+        <label htmlFor="start" className="text-sm font-semibold text-gray-700 dark:text-gray-200">
           Date & Time <span className="text-red-500">*</span>
         </label>
         <input
@@ -141,14 +141,14 @@ export const ReminderForm = ({
           name="start"
           value={formData.start}
           onChange={handleChange}
-          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-text ${
-            errors.start ? 'border-red-500 focus:border-red-500' : 'border-gray-200 focus:border-indigo-500'
+          className={`px-3 py-2.5 border-2 rounded-lg text-sm text-gray-900 dark:text-gray-100 dark:bg-gray-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-text ${
+            errors.start ? 'border-red-500 focus:border-red-500' : 'border-gray-200 dark:border-gray-600 focus:border-indigo-500'
           }`}
         />
         {errors.start && <span className="text-sm text-red-500 -mt-1">{errors.start}</span>}
       </div>
 
-      <div className="flex gap-3 justify-end mt-2 pt-5 border-t border-gray-200">
+      <div className="flex gap-3 justify-end mt-2 pt-5 border-t border-gray-200 dark:border-gray-700">
         <Button
           type="button"
           onClick={onCancel}

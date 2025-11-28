@@ -71,7 +71,7 @@ export const ResizableWeekEvent = ({
   const widthPercent = 100 / pos.maxColumns;
   const leftPercent = (pos.column / pos.maxColumns) * 100;
   const displayHeight = resizeHeight !== null ? resizeHeight : pos.height;
-  const isReadOnly = pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks';
+  const isReadOnly = pos.event.isReminder || pos.event.calendarId === 'tasks';
 
   return (
     <div
@@ -114,7 +114,7 @@ export const ResizableWeekEvent = ({
 
       <div
         className={`absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize bg-transparent group-hover:bg-blue-400/20 transition-colors z-10 ${
-          pos.event.calendarId === 'reminders' || pos.event.calendarId === 'tasks' ? 'hidden' : ''
+          pos.event.isReminder || pos.event.calendarId === 'tasks' ? 'hidden' : ''
         }`}
         onMouseDown={handleResizeStart}
         onClick={(e) => e.stopPropagation()}

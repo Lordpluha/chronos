@@ -17,7 +17,7 @@ class GoogleAuthService {
         ? `https://your-domain.com`
         : `http://${AppConfig.HOST}:${AppConfig.PORT}`
     const callbackUrl = `${baseUrl}/api/auth/google/callback`
-    console.log('🔗 Google OAuth Callback URL:', callbackUrl)
+
     return callbackUrl
   }
 
@@ -32,11 +32,11 @@ class GoogleAuthService {
       'https://www.googleapis.com/auth/userinfo.profile',
     ]
 
-    console.log('🔧 OAuth Configuration:')
-    console.log('  Client ID:', AppConfig.OAUTH_CLIENT_ID)
-    console.log('  Callback URL:', this.getCallbackUrl())
-    console.log('  Scopes:', scopes)
-    console.log('  State:', state)
+
+
+
+
+
 
     const authUrl = this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
@@ -45,13 +45,13 @@ class GoogleAuthService {
       prompt: 'consent',
     })
 
-    console.log('🔗 Generated Auth URL:', authUrl)
+
 
     // Извлекаем redirect_uri из URL для проверки
     const url = new URL(authUrl)
     const redirectUri = url.searchParams.get('redirect_uri')
-    console.log('📍 Extracted redirect_uri:', redirectUri)
-    console.log('📍 Decoded redirect_uri:', decodeURIComponent(redirectUri))
+
+
 
     return authUrl
   }
@@ -63,19 +63,13 @@ class GoogleAuthService {
    */
   async getTokens(code) {
     try {
-      console.log('🔄 Exchanging authorization code for tokens...')
-      console.log('  Code (first 20 chars):', code.substring(0, 20) + '...')
-      console.log('  Client ID:', AppConfig.OAUTH_CLIENT_ID)
-      console.log('  Redirect URI:', this.getCallbackUrl())
+
+
+
+
 
       const { tokens } = await this.oauth2Client.getToken(code)
-
-      console.log('✅ Successfully received tokens from Google')
-      console.log('  Access token received:', !!tokens.access_token)
-      console.log('  Refresh token received:', !!tokens.refresh_token)
-      console.log(
-        '  Expires in:',
-        tokens.expiry_date ? new Date(tokens.expiry_date) : 'N/A',
+ : 'N/A',
       )
 
       this.oauth2Client.setCredentials(tokens)

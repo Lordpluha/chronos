@@ -66,13 +66,10 @@ export function useUpdateEvent() {
 
   return useMutation({
     mutationFn: ({ id, data }) => {
-      console.log('🔄 useUpdateEvent: Sending to API', { id, data });
       return EventApi.update(id, data);
     },
     onSuccess: (response) => {
-      console.log('✅ useUpdateEvent: Success response', response);
       queryClient.invalidateQueries({ queryKey: eventKeys.all });
-      // Toast показывается в Week.jsx и DayView.jsx после проверки обновления
     },
     onError: (err) => {
       console.error('❌ Update event error:', err);

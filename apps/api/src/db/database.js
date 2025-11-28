@@ -18,7 +18,7 @@ export async function connectMongoDB() {
     await client.connect()
     db = client.db(AppConfig.DB_NAME)
 
-    console.log('✅ Connected to MongoDB Atlas (native driver)')
+
     return db
   } catch (error) {
     console.error('❌ MongoDB Atlas connection error:', error)
@@ -31,7 +31,7 @@ export async function connectMongoose() {
   try {
     // Reuse existing connection if available
     if (isConnected && mongoose.connection.readyState === 1) {
-      console.log('♻️ Reusing existing MongoDB connection')
+
       return mongoose.connection
     }
 
@@ -49,7 +49,7 @@ export async function connectMongoose() {
     })
 
     isConnected = true
-    console.log('✅ Connected to MongoDB Atlas (Mongoose)')
+
 
     mongoose.connection.on('error', (error) => {
       console.error('❌ Mongoose connection error:', error)
@@ -57,12 +57,12 @@ export async function connectMongoose() {
     })
 
     mongoose.connection.on('disconnected', () => {
-      console.log('⚠️ Mongoose disconnected from Atlas')
+
       isConnected = false
     })
 
     mongoose.connection.on('reconnected', () => {
-      console.log('🔄 Mongoose reconnected to Atlas')
+
       isConnected = true
     })
 
@@ -87,13 +87,13 @@ export async function closeDatabaseConnections() {
   try {
     if (client) {
       await client.close()
-      console.log('✅ MongoDB native client disconnected')
+
     }
 
     if (mongoose.connection.readyState === 1) {
       await mongoose.connection.close()
       isConnected = false
-      console.log('✅ Mongoose disconnected')
+
     }
   } catch (error) {
     console.error('❌ Error closing database connections:', error)
@@ -103,7 +103,7 @@ export async function closeDatabaseConnections() {
 // Serverless-friendly connection helper
 export async function ensureConnection() {
   if (!isConnected || mongoose.connection.readyState !== 1) {
-    console.log('🔄 Reconnecting to MongoDB Atlas...')
+
     await connectMongoose()
   }
   return mongoose.connection

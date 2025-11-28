@@ -1,26 +1,7 @@
 import { useState } from 'react';
-import { RemindersApi } from '../../api/RemindersApi';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
 
 export const ReminderCard = ({ reminder, onEdit, onDelete, onShare }) => {
   const [showActions, setShowActions] = useState(false);
-  const queryClient = useQueryClient();
-
-  const handleComplete = async (e) => {
-    e.stopPropagation();
-    try {
-      await RemindersApi.updateReminder(reminder._id, {
-        completed: true,
-        completed_at: new Date().toISOString(),
-      });
-      queryClient.invalidateQueries({ queryKey: ['reminders'] });
-      toast.success('Reminder completed ✓');
-    } catch (error) {
-      console.error('Failed to complete reminder:', error);
-      toast.error('Failed to complete reminder');
-    }
-  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -73,15 +54,6 @@ export const ReminderCard = ({ reminder, onEdit, onDelete, onShare }) => {
         </div>
         {showActions && (
           <div className="flex gap-1.5 opacity-100 transition-opacity">
-            <button
-              className="p-1.5 text-gray-600 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 border border-gray-200 dark:border-gray-600 hover:border-green-600 dark:hover:border-green-500 rounded-md transition-all"
-              onClick={handleComplete}
-              title="Mark as done"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M13.3337 4L6.00033 11.3333L2.66699 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
             <button
               className="p-1.5 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 border border-gray-200 dark:border-gray-600 hover:border-indigo-600 dark:hover:border-indigo-500 rounded-md transition-all"
               onClick={() => onEdit(reminder)}

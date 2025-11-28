@@ -27,9 +27,7 @@ class EventApiClass {
 
   // Update event
   async update(eventId, data) {
-    console.log('📡 EventApi.update: Sending request', { eventId, data });
     const response = await api.patch(`/events/${eventId}`, data);
-    console.log('📡 EventApi.update: Response received', response.data);
     return response.data;
   }
 

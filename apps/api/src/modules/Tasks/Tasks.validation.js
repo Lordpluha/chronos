@@ -16,6 +16,14 @@ export const createTaskSchema = z.object({
   tags: z
     .array(z.string().max(50, 'Tag must be at most 50 characters'))
     .default([]),
+  subtasks: z
+    .array(
+      z.object({
+        title: z.string().min(1, 'Subtask title is required').max(300),
+        completed: z.boolean().default(false),
+      })
+    )
+    .default([]),
   start: z.string().datetime().optional().nullable(),
   end: z.string().datetime().optional().nullable(),
   estimated_duration: z
@@ -40,6 +48,14 @@ export const updateTaskSchema = z.object({
     .optional(),
   tags: z
     .array(z.string().max(50, 'Tag must be at most 50 characters'))
+    .optional(),
+  subtasks: z
+    .array(
+      z.object({
+        title: z.string().min(1, 'Subtask title is required').max(300),
+        completed: z.boolean().default(false),
+      })
+    )
     .optional(),
   start: z.string().datetime().optional().nullable(),
   end: z.string().datetime().optional().nullable(),

@@ -129,7 +129,7 @@ export const useUpcomingTasks = (days = 7) => {
   });
 };
 
-export const useTasksWithDates = () => {
+export const useTasksWithDates = (options = {}) => {
   return useQuery({
     queryKey: ['tasksWithDates'],
     queryFn: async () => {
@@ -144,5 +144,6 @@ export const useTasksWithDates = () => {
 
       return allTasks;
     },
+    enabled: options.enabled !== false,
   });
 };

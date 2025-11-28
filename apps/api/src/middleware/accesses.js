@@ -28,7 +28,7 @@ export const requireAccessToken = async (req, res, next) => {
     req.accessCookie = access
     next()
   } catch (err) {
-    console.log('Access token validation failed:', err.message)
+
     return res.status(401).json()
   }
 }
@@ -60,7 +60,7 @@ export const requireRefreshToken = async (req, res, next) => {
     req.refreshCookie = refresh
     next()
   } catch (err) {
-		console.log('Refresh token validation failed:', err.message)
+
     return res.status(401)
   }
 }
@@ -96,7 +96,7 @@ export const optionalAccessToken = async (req, _res, next) => {
     }
   } catch (err) {
     // Игнорируем ошибки валидации токена для опционального middleware
-    console.log('Optional token validation failed:', err.message)
+
   }
 
   next()

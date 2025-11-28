@@ -53,7 +53,7 @@ async function startServer() {
     await initializeDatabase()
 
     app.listen(AppConfig.PORT, () => {
-      console.log(`🚀 Server is running on port ${AppConfig.PORT}`)
+
     })
   } catch (error) {
     console.error('❌ Failed to start server:', error)
