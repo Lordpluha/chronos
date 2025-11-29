@@ -139,18 +139,7 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [ ] Использовать EventApi.addAttendee()
     [ ] Использовать EventApi.removeAttendee()
 
-[ ] 2.6. Reminders внутри события
-    [ ] src/entities/Event/ui/ReminderSettings.jsx
-    [ ] Добавить напоминания: email/push
-    [ ] Время: за N минут до события
-    [ ] Множественные напоминания
 
-[ ] 2.7. Повторяющиеся события (RRULE)
-    [ ] src/entities/Event/ui/RecurrenceSelector.jsx
-    [ ] none / daily / weekly / monthly / yearly / custom
-    [ ] Установить библиотеку rrule
-    [ ] Парсинг и создание RRULE
-    [ ] Опция "изменить: это событие / всю серию / будущие"
 
 
 ================================================================================
@@ -191,7 +180,7 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [ ] src/features/Calendar/ShareCalendar/ShareCalendar.jsx
     [ ] Кнопка "Share" у календаря
     [ ] Приглашение по email
-    [ ] Роли: owner / editor / viewer
+    [ ] Права: create / read / update / delete / share
     [ ] Использовать CalendarApi.share()
     [ ] Публичная ссылка (опционально)
 
@@ -354,8 +343,7 @@ PLAN: Создать единую страницу /account с интегрир�
     [ ] Email уведомления (вкл/выкл)
     [ ] Push уведомления (вкл/выкл)
     [ ] Default reminder offset (5/10/15/30 минут)
-    [ ] Reminder snackbar position (top-right/bottom-right)
-    [ ] Sound notifications (вкл/выкл)
+    [?] Sound notifications (вкл/выкл)
 
 [ ] 6.4. Calendars Tab
     [ ] Список всех календарей пользователя
@@ -368,8 +356,6 @@ PLAN: Создать единую страницу /account с интегрир�
     [x] Dark theme toggle (уже работает через next-themes)
     [ ] Calendar start day (Monday/Sunday)
     [ ] Week numbers display (on/off)
-    [ ] Compact/Normal/Comfortable view density
-    [ ] Custom theme colors (advanced)
 
 [ ] 6.6. Avatar Upload Feature
     [ ] src/features/Account/UploadAvatar/UploadAvatar.jsx
@@ -380,6 +366,10 @@ PLAN: Создать единую страницу /account с интегрир�
     [ ] Cloudinary/S3 для хранения (или local storage)
     [ ] Оптимизация изображения (max 500x500px, JPEG/PNG)
     [ ] Удаление аватара (вернуть к default)
+
+[] 6.7 Список сессий и их контроль
+
+[] 6.8 Интеграция гугл апи
 
 
 ================================================================================
