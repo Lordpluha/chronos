@@ -127,11 +127,11 @@ router.post(
 // Google OAuth routes
 router.get('/auth/google', async (req, res) => {
   try {
-
+    console.log('🚀 Initiating Google OAuth...')
 
     // Генерируем state для защиты от CSRF
     const state = Math.random().toString(36).substring(2, 15)
-
+    console.log('🔐 Generated state:', state)
 
     // Сохраняем state в cookie для проверки в callback
     res.cookie('oauth_state', state, {
@@ -142,7 +142,7 @@ router.get('/auth/google', async (req, res) => {
     })
 
     const authUrl = authService.getGoogleAuthUrl(state)
-
+    console.log('🔗 Redirecting to Google Auth URL:', authUrl)
     return res.redirect(authUrl)
   } catch (err) {
     console.error('❌ Google OAuth initiation error:', err)
@@ -155,21 +155,25 @@ router.get('/auth/google', async (req, res) => {
 router.get('/auth/google/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query
-}...)` : 'Missing',
+
+    console.log('📥 Google OAuth Callback received:')
+    console.log(
+      '  Code:',
+      code ? `Present (${code.substring(0, 10)}...)` : 'Missing',
     )
-
-
-
+    console.log('  State from query:', state)
+    console.log('  Error:', error)
+    console.log('  Request URL:', req.originalUrl)
 
     // Проверяем наличие ошибки от Google
     if (error) {
-
+      console.log('❌ Google OAuth error:', error)
       return res.status(400).json({ message: `Google OAuth error: ${error}` })
     }
 
     // Проверяем наличие кода
     if (!code) {
-
+      console.log('❌ Authorization code not provided')
       return res
         .status(400)
         .json({ message: 'Authorization code not provided' })
@@ -178,7 +182,7 @@ router.get('/auth/google/callback', async (req, res) => {
     // Проверяем, не был ли код уже использован
     const isUsed = await UsedOAuthCode.isCodeUsed(code)
     if (isUsed) {
-
+      console.log('❌ Authorization code has already been used')
       return res
         .status(400)
         .json({ message: 'Authorization code has already been used' })
@@ -187,7 +191,7 @@ router.get('/auth/google/callback', async (req, res) => {
     // Добавляем код в список использованных (истекает через 10 минут)
     await UsedOAuthCode.markAsUsed(code, 10)
 
-
+    console.log('🔄 Processing Google OAuth callback...')
 
     // Обрабатываем callback и получаем токены
     const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
@@ -203,6 +207,11 @@ router.get('/auth/google/callback', async (req, res) => {
       process.env.NODE_ENV === 'production'
         ? `https://${process.env.FRONT_HOST}`
         : `http://${process.env.FRONT_HOST}:${process.env.FRONT_PORT}`
+
+    console.log(
+      '✅ Google OAuth successful, redirecting to:',
+      `${frontendUrl}/calendar`,
+    )
     return res.redirect(`${frontendUrl}/calendar`)
   } catch (err) {
     console.error('❌ Google OAuth callback error:', err)
