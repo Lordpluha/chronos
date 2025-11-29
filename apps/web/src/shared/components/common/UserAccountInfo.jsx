@@ -27,7 +27,7 @@ export default function UserAccountInfo() {
 
   return (
     <div className="flex items-center gap-4">
-      <div 
+      <div
         className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
         onClick={handleAccountClick}
       >
