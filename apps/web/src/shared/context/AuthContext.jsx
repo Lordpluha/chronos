@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     register,
     checkAuth,
+    refreshUser: checkAuth, // Alias for checkAuth
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

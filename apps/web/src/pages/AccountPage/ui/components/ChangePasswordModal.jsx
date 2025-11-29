@@ -5,8 +5,11 @@ import { Input } from '@shared/ui/input';
 import { Label } from '@shared/ui/label';
 import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { UserApi } from '@entities/User';
+import { useAuth } from '@shared/context/AuthContext';
 
 export function ChangePasswordModal({ onClose }) {
+  const { refreshUser } = useAuth();
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -59,12 +62,18 @@ export function ChangePasswordModal({ onClose }) {
 
     setIsLoading(true);
     try {
-      // TODO: Implement password change API call
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await UserApi.changePassword({
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword,
+      });
       toast.success('Password changed successfully');
+      // Optionally refresh user data
+      await refreshUser();
       onClose();
     } catch (error) {
-      toast.error('Failed to change password');
+      console.error('Failed to change password:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to change password';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

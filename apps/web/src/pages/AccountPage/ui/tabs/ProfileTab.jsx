@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shared/ui/card';
 import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
@@ -8,34 +8,59 @@ import { Badge } from '@shared/ui/badge';
 import { Upload, User, Mail, Lock, Shield, Trash2 } from 'lucide-react';
 import { AvatarUpload } from '../components/AvatarUpload';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
+import { DeleteAccountModal } from '../components/DeleteAccountModal';
 import { toast } from 'sonner';
+import { UserApi } from '@entities/User';
+import { useAuth } from '@shared/context/AuthContext';
 
 export function ProfileTab({ user }) {
+  const { refreshUser } = useAuth();
   const [showAvatarUpload, setShowAvatarUpload] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
     email: user?.email || '',
   });
 
+  // Update formData when user changes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        full_name: user.full_name || '',
+        email: user.email || '',
+      });
+    }
+  }, [user]);
+
   const handleSaveProfile = async () => {
+    setIsSaving(true);
     try {
-      // TODO: Implement API call to update profile
+      await UserApi.updateProfile(formData);
       toast.success('Profile updated successfully');
       setIsEditing(false);
+      // Refresh user data
+      await refreshUser();
     } catch (error) {
-      toast.error('Failed to update profile');
+      console.error('Failed to update profile:', error);
+      toast.error(error.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleAvatarUpload = async (file) => {
     try {
-      // TODO: Implement avatar upload API call
+      const result = await UserApi.uploadAvatar(file);
       toast.success('Avatar uploaded successfully');
       setShowAvatarUpload(false);
+      // Refresh user data
+      await refreshUser();
     } catch (error) {
-      toast.error('Failed to upload avatar');
+      console.error('Failed to upload avatar:', error);
+      toast.error(error.response?.data?.message || 'Failed to upload avatar');
     }
   };
 
@@ -135,8 +160,8 @@ export function ProfileTab({ user }) {
                 </Button>
               ) : (
                 <>
-                  <Button onClick={handleSaveProfile}>
-                    Save Changes
+                  <Button onClick={handleSaveProfile} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                   <Button
                     variant="outline"
@@ -147,6 +172,7 @@ export function ProfileTab({ user }) {
                         email: user?.email || '',
                       });
                     }}
+                    disabled={isSaving}
                   >
                     Cancel
                   </Button>
@@ -223,6 +249,7 @@ export function ProfileTab({ user }) {
             <Button
               variant="destructive"
               className="bg-red-600 hover:bg-red-700"
+              onClick={() => setShowDeleteAccount(true)}
             >
               Delete Account
             </Button>
@@ -242,6 +269,13 @@ export function ProfileTab({ user }) {
       {showChangePassword && (
         <ChangePasswordModal
           onClose={() => setShowChangePassword(false)}
+        />
+      )}
+
+      {showDeleteAccount && (
+        <DeleteAccountModal
+          onClose={() => setShowDeleteAccount(false)}
+          isGoogleUser={!!user?.google_id}
         />
       )}
     </>
