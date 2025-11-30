@@ -10,7 +10,9 @@ import { Button } from "@shared/ui/button";
 import { Input } from "@shared/ui/input";
 import { Label } from "@shared/ui/label";
 import { Textarea } from "@shared/ui/textarea";
+import { Share2 } from 'lucide-react';
 import { useCreateCalendar, useUpdateCalendar } from '@shared/hooks';
+import { ShareCalendarDialog } from '@features/Calendar/ShareCalendar/ShareCalendarDialog';
 import { toast } from 'sonner';
 
 const PRESET_COLORS = [
@@ -30,6 +32,7 @@ export const CalendarFormDialog = ({ open, onOpenChange, calendar }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [color, setColor] = useState('#3b82f6');
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   const createMutation = useCreateCalendar();
   const updateMutation = useUpdateCalendar();
@@ -90,13 +93,26 @@ export const CalendarFormDialog = ({ open, onOpenChange, calendar }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {calendar ? 'Edit Calendar' : 'Create Calendar'}
-          </DialogTitle>
-          <DialogDescription>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>{calendar ? 'Edit Calendar' : 'Create Calendar'}</span>
+              {calendar && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShareDialog(true)}
+                  className="gap-2"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+              )}
+            </DialogTitle>
+            <DialogDescription>
             {calendar
               ? 'Update your calendar details'
               : 'Create a new calendar to organize your events'
@@ -167,5 +183,13 @@ export const CalendarFormDialog = ({ open, onOpenChange, calendar }) => {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Share Calendar Dialog */}
+    <ShareCalendarDialog
+      open={showShareDialog}
+      onOpenChange={setShowShareDialog}
+      calendar={calendar}
+    />
+  </>
   );
 };

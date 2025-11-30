@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@shared/ui/input";
 import { Label } from "@shared/ui/label";
 import { Textarea } from "@shared/ui/textarea";
-import { Clock, Trash2, GripVertical, Calendar } from "lucide-react";
+import { Clock, Trash2, GripVertical, Calendar, Share2 } from "lucide-react";
+import { ShareEventDialog } from "@features/Events/ShareEvent/ShareEventDialog";
 import { toast } from "sonner";
 import {
   Select,
@@ -36,6 +37,7 @@ export const EventModal = () => {
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     selectedEvent?.calendarId || defaultCalendarId
   );
+  const [showShareDialog, setShowShareDialog] = useState(false);
 
   // Состояния для перетаскивания
   const [isDragging, setIsDragging] = useState(false);
@@ -139,8 +141,9 @@ export const EventModal = () => {
   }
 
   return (
-    <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
-      <DialogContent
+    <>
+      <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
+        <DialogContent
         ref={modalRef}
         className="sm:max-w-[500px] p-0 gap-0"
         style={{
@@ -158,6 +161,18 @@ export const EventModal = () => {
               {selectedEvent ? "Edit Event" : "Create Event"}
             </DialogTitle>
           </div>
+          {selectedEvent && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowShareDialog(true)}
+              className="gap-2"
+            >
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
@@ -292,5 +307,13 @@ export const EventModal = () => {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Share Event Dialog */}
+    <ShareEventDialog
+      open={showShareDialog}
+      onOpenChange={setShowShareDialog}
+      event={selectedEvent}
+    />
+  </>
   );
 };

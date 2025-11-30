@@ -3,13 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@shar
 import { Button } from '@shared/ui/button';
 import { Badge } from '@shared/ui/badge';
 import { useCalendars } from '@shared/hooks/useCalendars';
-import { Calendar, Download, Trash2, Star } from 'lucide-react';
+import { Calendar, Download, Trash2, Star, Share2 } from 'lucide-react';
+import { ShareCalendarDialog } from '@features/Calendar/ShareCalendar/ShareCalendarDialog';
 import { toast } from 'sonner';
 
 export function CalendarsTab() {
   const { data: calendarsData, isLoading, error } = useCalendars();
   // API возвращает массив напрямую, а не { data: [] }
   const calendars = Array.isArray(calendarsData) ? calendarsData : (calendarsData?.data || []);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [selectedCalendar, setSelectedCalendar] = useState(null);
 
   // Debug logging - оставим для проверки
   console.log('📊 CalendarsTab Debug:');
@@ -35,6 +38,11 @@ export function CalendarsTab() {
     if (confirm('Are you sure you want to delete this calendar?')) {
       toast.success('Calendar deleted');
     }
+  };
+
+  const handleShare = (calendar) => {
+    setSelectedCalendar(calendar);
+    setShowShareDialog(true);
   };
 
   if (isLoading) {
@@ -126,6 +134,7 @@ export function CalendarsTab() {
                       size="sm"
                       onClick={() => handleSetDefault(calendar._id)}
                       className="text-gray-600 hover:text-indigo-600"
+                      title="Set as default"
                     >
                       <Star className="h-4 w-4" />
                     </Button>
@@ -133,8 +142,18 @@ export function CalendarsTab() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => handleShare(calendar)}
+                    className="text-gray-600 hover:text-green-600"
+                    title="Share calendar"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleExport(calendar)}
                     className="text-gray-600 hover:text-blue-600"
+                    title="Export calendar"
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -144,6 +163,7 @@ export function CalendarsTab() {
                     onClick={() => handleDelete(calendar._id)}
                     className="text-gray-600 hover:text-red-600"
                     disabled={calendar.is_default}
+                    title="Delete calendar"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -188,6 +208,13 @@ export function CalendarsTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Share Calendar Dialog */}
+      <ShareCalendarDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        calendar={selectedCalendar}
+      />
     </>
   );
 }

@@ -176,13 +176,17 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [ ] Можно использовать: https://date.nager.at/Api
     [ ] Отображать праздники другим стилем
 
-[ ] 3.6. Sharing календарей
-    [ ] src/features/Calendar/ShareCalendar/ShareCalendar.jsx
-    [ ] Кнопка "Share" у календаря
-    [ ] Приглашение по email
-    [ ] Права: create / read / update / delete / share
-    [ ] Использовать CalendarApi.share()
-    [ ] Публичная ссылка (опционально)
+[~] 3.6. Sharing календарей (ВИЗУАЛ ГОТОВ, API TODO)
+    [x] src/features/Calendar/ShareCalendar/ShareCalendarDialog.jsx
+    [x] Кнопка "Share" в CalendarFormDialog
+    [x] Кнопка "Share" в CalendarsTab (Account Settings)
+    [x] Приглашение по email (UI готов)
+    [x] Права: read / write / admin (UI готов)
+    [x] Публичная ссылка (UI готов)
+    [x] Список людей с доступом (UI готов)
+    [x] Удаление доступа (UI готов)
+    [ ] Использовать CalendarApi.share() - TODO backend integration
+    [ ] Использовать CalendarApi.removeShare() - TODO backend integration
 
 
 ================================================================================
@@ -269,6 +273,19 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [x] Отображение времени в Day view карточках
     [x] Отображение времени в Month view (Day компонент)
     [x] Формат: HH:mm - HH:mm
+
+[~] 5.3.2. Sharing событий (ВИЗУАЛ ГОТОВ, API TODO)
+    [x] src/features/Events/ShareEvent/ShareEventDialog.jsx
+    [x] Кнопка "Share" в EventModal
+    [x] Приглашение участников (attendees) по email (UI готов)
+    [x] Роли: organizer / participant / viewer (UI готов)
+    [x] Статусы участников: pending / accepted / declined / tentative (UI готов)
+    [x] Копирование ссылки на событие (UI готов)
+    [x] Список участников с аватарами (UI готов)
+    [x] Удаление участников (UI готов)
+    [ ] Использовать EventApi.invite() - TODO backend integration
+    [ ] Использовать EventApi.removeAttendee() - TODO backend integration
+    [ ] Использовать EventApi.updateAttendeeStatus() - TODO backend integration
 
 [ ] 5.5. "+N more" в Month view
     [ ] Если событий > 3, показывать "+N more"
