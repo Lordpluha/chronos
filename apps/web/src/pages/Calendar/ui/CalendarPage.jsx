@@ -7,16 +7,18 @@ import { Week } from "../components/Week";
 import { DayView } from "../components/DayView";
 import { CalendarWeekHeader } from "../components/CalendarWeekHeader";
 import { getMonth } from "@shared/utils/calendar";
+import { useCalendarSettings } from "@shared/hooks/useCalendarSettings";
 import { CalendarContext } from "@shared/context/CalendarContext";
 import { EventModal } from "../components/EventModal";
 
 export function CalendarPage() {
   const { monthIndex, showEventModal, viewMode, isLoadingEvents, eventsError } = useContext(CalendarContext);
-  const [currentMonth, setCurrentMonth] = useState(getMonth(monthIndex));
+  const { settings } = useCalendarSettings();
+  const [currentMonth, setCurrentMonth] = useState(getMonth(monthIndex, settings.weekStartsOn));
 
   useEffect(() => {
-    setCurrentMonth(getMonth(monthIndex));
-  }, [monthIndex]);
+    setCurrentMonth(getMonth(monthIndex, settings.weekStartsOn));
+  }, [monthIndex, settings.weekStartsOn]);
 
   if (isLoadingEvents) {
     return (

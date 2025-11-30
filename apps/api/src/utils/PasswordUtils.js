@@ -63,7 +63,6 @@ export class PasswordUtilsClass {
     const hasUppercase = /[A-Z]/.test(password)
     const hasLowercase = /[a-z]/.test(password)
     const hasNumbers = /\d/.test(password)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
 
     const errors = []
 
@@ -81,10 +80,6 @@ export class PasswordUtilsClass {
 
     if (!hasNumbers) {
       errors.push('Password must contain at least one number')
-    }
-
-    if (!hasSpecialChar) {
-      errors.push('Password must contain at least one special character')
     }
 
     return {

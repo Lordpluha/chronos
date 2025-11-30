@@ -1,6 +1,7 @@
 import React, { useContext, useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useCalendarSettings } from '@shared/hooks/useCalendarSettings';
 import { useUpdateReminder } from '@features/Reminders';
 import { toast } from 'sonner';
 import { ResizableWeekEvent } from './ResizableWeekEvent';
@@ -8,6 +9,7 @@ import styles from './Week.module.css';
 
 export const Week = () => {
   const { daySelected, setDaySelected, filteredEvents, setSelectedEvent, setShowEventModal, dispatchCalEvent, visibleCalendarIds } = useContext(CalendarContext);
+  const { settings } = useCalendarSettings();
   const { mutate: updateReminder } = useUpdateReminder();
   const [draggedEvent, setDraggedEvent] = useState(null);
   const [localUpdates, setLocalUpdates] = useState({});
@@ -54,11 +56,12 @@ export const Week = () => {
     });
   }, [filteredEvents, localUpdates]);
 
-  // Get the week days starting from Sunday
+  // Get the week days starting from user preference (Monday or Sunday)
   const weekDays = useMemo(() => {
-    const startOfWeek = daySelected.startOf('week'); // Sunday
+    const weekStartDay = settings.weekStartsOn === 'sunday' ? 0 : 1; // 0 = Sunday, 1 = Monday
+    const startOfWeek = daySelected.day(weekStartDay); // Set to the user's preferred start day
     return Array.from({ length: 7 }, (_, i) => startOfWeek.add(i, 'day'));
-  }, [daySelected]);
+  }, [daySelected, settings.weekStartsOn]);
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
 

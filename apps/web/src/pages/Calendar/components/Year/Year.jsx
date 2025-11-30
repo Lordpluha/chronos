@@ -1,9 +1,11 @@
 import React, { useContext } from 'react';
 import dayjs from 'dayjs';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useCalendarSettings } from '@shared/hooks/useCalendarSettings';
 
 export const Year = () => {
   const { setMonthIndex, setDaySelected } = useContext(CalendarContext);
+  const { settings } = useCalendarSettings();
   const currentYear = dayjs().year();
 
   const months = [
@@ -15,7 +17,12 @@ export const Year = () => {
   const getMonthDays = (monthIndex) => {
     const firstDayOfMonth = dayjs(new Date(currentYear, monthIndex, 1));
     const daysInMonth = firstDayOfMonth.daysInMonth();
-    const startingDayOfWeek = firstDayOfMonth.day();
+    let startingDayOfWeek = firstDayOfMonth.day();
+
+    // Adjust for week start preference
+    if (settings.weekStartsOn === 'monday') {
+      startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+    }
 
     const daysArray = [];
 
@@ -49,6 +56,15 @@ export const Year = () => {
     );
   };
 
+  // Get day labels based on week start preference
+  const getDayLabels = () => {
+    if (settings.weekStartsOn === 'sunday') {
+      return ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    } else {
+      return ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto scrollbar-custom p-6 bg-white dark:bg-gray-800">
       <div className="flex items-center justify-between mb-6">
@@ -64,7 +80,7 @@ export const Year = () => {
 
             {/* Days of week header */}
             <div className="grid grid-cols-7 gap-1 mb-1">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
+              {getDayLabels().map((day, idx) => (
                 <div key={idx} className="text-xs text-gray-500 dark:text-gray-400 text-center font-medium">
                   {day}
                 </div>

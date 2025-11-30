@@ -6,12 +6,14 @@ import UserAccountInfo from "@shared/components/common/UserAccountInfo";
 import { Button } from "@shared/ui/button";
 import { CalendarContext } from "@shared/context/CalendarContext";
 import { useTheme } from "@shared/context/ThemeContext";
+import { useCalendarSettings } from "@shared/hooks/useCalendarSettings";
 import { ROUTES } from "@shared/routes";
 
 export function CalendarHeader() {
   const navigate = useNavigate();
   const { monthIndex, setMonthIndex, viewMode, setViewMode, daySelected, setDaySelected } = useContext(CalendarContext);
   const { theme, toggleTheme } = useTheme();
+  const { settings } = useCalendarSettings();
 
   function handlePrev() {
     if (viewMode === 'day') {
@@ -51,8 +53,9 @@ export function CalendarHeader() {
     if (viewMode === 'day') {
       return daySelected.format('MMMM DD, YYYY');
     } else if (viewMode === 'week') {
-      const startOfWeek = daySelected.startOf('week');
-      const endOfWeek = daySelected.endOf('week');
+      const weekStartDay = settings.weekStartsOn === 'sunday' ? 0 : 1;
+      const startOfWeek = daySelected.day(weekStartDay);
+      const endOfWeek = startOfWeek.add(6, 'day');
       return `${startOfWeek.format('MMM DD')} - ${endOfWeek.format('MMM DD, YYYY')}`;
     } else if (viewMode === 'year') {
       return dayjs(new Date(dayjs().year(), monthIndex)).format('YYYY');

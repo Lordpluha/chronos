@@ -1,12 +1,14 @@
 import dayjs from "dayjs";
 import React, { useContext, useEffect, useState } from "react";
 import { getMonth } from "@shared/utils/calendar";
+import { useCalendarSettings } from "@shared/hooks/useCalendarSettings";
 import { Button } from "@shared/ui/button";
 import { CalendarContext } from "@shared/context/CalendarContext";
 
 export const SmallCalendar = () => {
+  const { settings } = useCalendarSettings();
   const [currentMonthIdx, setCurrentMonthIdx] = useState(dayjs().month());
-  const [currentMonth, setCurrentMonth] = useState(getMonth());
+  const [currentMonth, setCurrentMonth] = useState(getMonth(dayjs().month(), settings.weekStartsOn));
   const { monthIndex, setMonthIndex, daySelected, setDaySelected } = useContext(CalendarContext);
 
   useEffect(() => {
@@ -14,8 +16,8 @@ export const SmallCalendar = () => {
   }, [monthIndex]);
 
   useEffect(() => {
-    setCurrentMonth(getMonth(currentMonthIdx));
-  }, [currentMonthIdx]);
+    setCurrentMonth(getMonth(currentMonthIdx, settings.weekStartsOn));
+  }, [currentMonthIdx, settings.weekStartsOn]);
 
   function handlePrevMonth() {
     setCurrentMonthIdx(currentMonthIdx - 1);

@@ -11,6 +11,7 @@ const app = express()
 app.disable('x-powered-by')
 
 app.use(express.static('public'))
+app.use('/uploads', express.static('uploads'))
 
 // Middleware
 app.use(

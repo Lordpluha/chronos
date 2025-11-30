@@ -63,7 +63,7 @@ export class UserApi {
    * @returns {Promise<Object>} User data
    */
   static async getProfile() {
-    const response = await api.get('/users/me');
-    return response.data.user || response.data;
+    const response = await api.get('/auth/me');
+    return response.data;
   }
 }

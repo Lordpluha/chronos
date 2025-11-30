@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '@shared/context/AuthContext';
 import { useNavigate } from 'react-router';
 import { Button } from '@shared/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@shared/ui/avatar';
 import { ROUTES } from '@shared/routes';
 import toast from 'react-hot-toast';
 
@@ -37,12 +38,13 @@ export default function UserAccountInfo() {
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
         </div>
-        <div className="w-10 h-10 bg-linear-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
-          <span className="text-white font-semibold text-sm">
+        <Avatar className="w-10 h-10">
+          <AvatarImage src={user.avatar} alt={user.full_name} />
+          <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-500 text-white">
             {user.full_name?.charAt(0).toUpperCase() ||
               user.login?.charAt(0).toUpperCase()}
-          </span>
-        </div>
+          </AvatarFallback>
+        </Avatar>
       </div>
       <Button onClick={handleLogout} variant="outline" size="sm">
         Logout

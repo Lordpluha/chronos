@@ -7,8 +7,18 @@ import { Calendar, Download, Trash2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function CalendarsTab() {
-  const { data: calendarsData, isLoading } = useCalendars();
-  const calendars = calendarsData?.data || [];
+  const { data: calendarsData, isLoading, error } = useCalendars();
+  // API возвращает массив напрямую, а не { data: [] }
+  const calendars = Array.isArray(calendarsData) ? calendarsData : (calendarsData?.data || []);
+
+  // Debug logging - оставим для проверки
+  console.log('📊 CalendarsTab Debug:');
+  console.log('  Raw data:', calendarsData);
+  console.log('  Is Array?:', Array.isArray(calendarsData));
+  console.log('  Calendars array:', calendars);
+  console.log('  Calendars length:', calendars.length);
+  console.log('  Is loading:', isLoading);
+  console.log('  Error:', error);
 
   const handleSetDefault = (calendarId) => {
     // TODO: Implement set default calendar API call
@@ -37,6 +47,19 @@ export function CalendarsTab() {
     );
   }
 
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-red-500">
+            <p className="font-medium">Error loading calendars</p>
+            <p className="text-sm mt-2">{error.message || 'Unknown error'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card>
@@ -50,7 +73,14 @@ export function CalendarsTab() {
           {calendars.length === 0 ? (
             <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No calendars found</p>
+              <p className="mb-2">No calendars found</p>
+              <p className="text-sm mb-4">Create your first calendar to get started</p>
+              <Button
+                onClick={() => toast.info('Calendar creation coming soon')}
+                variant="outline"
+              >
+                Create Calendar
+              </Button>
             </div>
           ) : (
             calendars.map((calendar) => (

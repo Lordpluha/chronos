@@ -1,7 +1,13 @@
 import React from 'react';
+import { useCalendarSettings } from '@shared/hooks/useCalendarSettings';
 
 export default function CalendarWeekHeader() {
-  const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const { settings } = useCalendarSettings();
+
+  const weekDaysFromSunday = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const weekDaysFromMonday = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+  const weekDays = settings.weekStartsOn === 'sunday' ? weekDaysFromSunday : weekDaysFromMonday;
 
   return (
     <div className="grid grid-cols-7 border-b border-gray-200">

@@ -3,3 +3,4 @@ export * from './useCalendars';
 export * from './useCreateCalendar';
 export * from './useUpdateCalendar';
 export * from './useDeleteCalendar';
+export * from './useCalendarSettings';
