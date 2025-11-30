@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@shared/ui/dialog';
 import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
 import { Label } from '@shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/ui/select';
 import { Switch } from '@shared/ui/switch';
-import { Copy, Mail, Link2, Users, Trash2, Check } from 'lucide-react';
+import { Copy, Mail, Link2, Users, Trash2, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CalendarApi } from '@entities/Calendar/api/CalendarApi';
 
 export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   const [email, setEmail] = useState('');
@@ -14,34 +15,80 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   const [publicLink, setPublicLink] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [sharedWith, setSharedWith] = useState([
-    { id: 1, email: 'john@example.com', permission: 'read', avatar: 'J' },
-    { id: 2, email: 'sarah@example.com', permission: 'write', avatar: 'S' },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [sharedWith, setSharedWith] = useState([]);
 
-  const handleShare = () => {
+  // Load existing shares from calendar object
+  useEffect(() => {
+    if (calendar?.shared_with) {
+      const shares = calendar.shared_with.map((share, index) => ({
+        id: share._id || index,
+        email: share.user?.email || share.email,
+        permission: share.permission,
+        avatar: (share.user?.email || share.email)?.[0]?.toUpperCase() || '?',
+        userId: share.user?._id || share.user,
+      }));
+      setSharedWith(shares);
+    }
+  }, [calendar]);
+
+  const handleShare = async () => {
     if (!email) {
       toast.error('Please enter an email');
       return;
     }
 
-    // TODO: Implement CalendarApi.share()
-    const newShare = {
-      id: Date.now(),
-      email,
-      permission,
-      avatar: email[0].toUpperCase(),
-    };
+    if (!calendar?._id) {
+      toast.error('Calendar ID is missing');
+      return;
+    }
 
-    setSharedWith([...sharedWith, newShare]);
-    setEmail('');
-    toast.success(`Calendar shared with ${email}`);
+    setLoading(true);
+    try {
+      const response = await CalendarApi.share(calendar._id, {
+        userEmail: email,
+        permission: permission,
+      });
+
+      // Update local state with new share
+      const newShare = {
+        id: Date.now(),
+        email,
+        permission,
+        avatar: email[0].toUpperCase(),
+      };
+
+      setSharedWith([...sharedWith, newShare]);
+      setEmail('');
+      toast.success(`Calendar shared with ${email}`);
+    } catch (error) {
+      console.error('Error sharing calendar:', error);
+      toast.error(error.response?.data?.message || 'Failed to share calendar');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemoveShare = (id) => {
-    // TODO: Implement CalendarApi.removeShare()
-    setSharedWith(sharedWith.filter(s => s.id !== id));
-    toast.success('Access removed');
+  const handleRemoveShare = async (shareItem) => {
+    if (!calendar?._id) {
+      toast.error('Calendar ID is missing');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await CalendarApi.removeAccess(calendar._id, {
+        userEmail: shareItem.email,
+      });
+
+      setSharedWith(sharedWith.filter(s => s.id !== shareItem.id));
+      toast.success('Access removed');
+    } catch (error) {
+      console.error('Error removing access:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove access');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -101,8 +148,12 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                   <SelectItem value="admin">Full access</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleShare}>
-                <Mail className="h-4 w-4 mr-2" />
+              <Button onClick={handleShare} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
                 Send
               </Button>
             </div>
@@ -117,7 +168,7 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                     className="flex items-center justify-between p-2 rounded-md border border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                      <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
                         {user.avatar}
                       </div>
                       <div>
@@ -129,9 +180,14 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleRemoveShare(user.id)}
+                      onClick={() => handleRemoveShare(user)}
+                      disabled={loading}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}

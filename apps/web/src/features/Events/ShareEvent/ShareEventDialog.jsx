@@ -1,45 +1,89 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@shared/ui/dialog';
 import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
 import { Label } from '@shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/ui/select';
-import { Copy, Mail, UserPlus, Trash2, Check } from 'lucide-react';
+import { Copy, Mail, UserPlus, Trash2, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { EventApi } from '@entities/Event/api/EventApi';
 
 export function ShareEventDialog({ open, onOpenChange, event }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
   const [copied, setCopied] = useState(false);
-  const [attendees, setAttendees] = useState([
-    { id: 1, email: 'alice@example.com', role: 'organizer', status: 'accepted', avatar: 'A' },
-    { id: 2, email: 'bob@example.com', role: 'participant', status: 'pending', avatar: 'B' },
-  ]);
+  const [loading, setLoading] = useState(false);
+  const [attendees, setAttendees] = useState([]);
 
-  const handleInvite = () => {
+  // Load existing attendees from event object
+  useEffect(() => {
+    if (event?.attendees) {
+      const mappedAttendees = event.attendees.map((attendee, index) => ({
+        id: attendee._id || index,
+        email: attendee.email,
+        role: attendee.role || 'participant',
+        status: attendee.status || 'pending',
+        avatar: attendee.email?.[0]?.toUpperCase() || '?',
+      }));
+      setAttendees(mappedAttendees);
+    }
+  }, [event]);
+
+  const handleInvite = async () => {
     if (!email) {
       toast.error('Please enter an email');
       return;
     }
 
-    // TODO: Implement EventApi.invite()
-    const newAttendee = {
-      id: Date.now(),
-      email,
-      role,
-      status: 'pending',
-      avatar: email[0].toUpperCase(),
-    };
+    if (!event?._id) {
+      toast.error('Event ID is missing');
+      return;
+    }
 
-    setAttendees([...attendees, newAttendee]);
-    setEmail('');
-    toast.success(`Invitation sent to ${email}`);
+    setLoading(true);
+    try {
+      await EventApi.addAttendee(event._id, {
+        email,
+        role,
+      });
+
+      const newAttendee = {
+        id: Date.now(),
+        email,
+        role,
+        status: 'pending',
+        avatar: email[0].toUpperCase(),
+      };
+
+      setAttendees([...attendees, newAttendee]);
+      setEmail('');
+      toast.success(`Invitation sent to ${email}`);
+    } catch (error) {
+      console.error('Error inviting attendee:', error);
+      toast.error(error.response?.data?.message || 'Failed to invite attendee');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemoveAttendee = (id) => {
-    // TODO: Implement EventApi.removeAttendee()
-    setAttendees(attendees.filter(a => a.id !== id));
-    toast.success('Attendee removed');
+  const handleRemoveAttendee = async (attendee) => {
+    if (!event?._id) {
+      toast.error('Event ID is missing');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await EventApi.removeAttendee(event._id, attendee.id);
+
+      setAttendees(attendees.filter(a => a.id !== attendee.id));
+      toast.success('Attendee removed');
+    } catch (error) {
+      console.error('Error removing attendee:', error);
+      toast.error(error.response?.data?.message || 'Failed to remove attendee');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyEventLink = () => {
@@ -105,8 +149,12 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                   <SelectItem value="organizer">Organizer</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleInvite}>
-                <Mail className="h-4 w-4 mr-2" />
+              <Button onClick={handleInvite} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 mr-2" />
+                )}
                 Invite
               </Button>
             </div>
@@ -123,7 +171,7 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                     className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-3 flex-1">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
+                      <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
                         {attendee.avatar}
                       </div>
                       <div className="flex-1">
@@ -143,9 +191,14 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleRemoveAttendee(attendee.id)}
+                        onClick={() => handleRemoveAttendee(attendee)}
+                        disabled={loading}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {loading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </Button>
                     )}
                   </div>
@@ -187,14 +240,6 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button onClick={() => toast.success('Invitations sent!')}>
-            Send Invitations
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
