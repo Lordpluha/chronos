@@ -18,8 +18,8 @@ export const CalendarContextWrapper = (props) => {
   const [visibleCalendarIds, setVisibleCalendarIds] = useState([]);
   const [calendarCreated, setCalendarCreated] = useState(false);
 
-  const { data: calendarsData, isLoading: isLoadingCalendars } = useCalendars({ enabled: isAuthenticated });
-  const { data: eventsData, isLoading, error } = useEvents({ enabled: isAuthenticated });
+  const { data: calendarsData, isLoading: isLoadingCalendars, refetch: refetchCalendars } = useCalendars({ enabled: isAuthenticated });
+  const { data: eventsData, isLoading, error, refetch: refetchEvents } = useEvents({ enabled: isAuthenticated });
   const { reminders, loading: loadingReminders, fetchReminders } = useReminders();
   const { data: tasksData = [] } = useTasksWithDates({ enabled: isAuthenticated });
 
@@ -53,11 +53,13 @@ export const CalendarContextWrapper = (props) => {
 
     return cals.map(cal => ({
       id: cal._id || cal.id,
+      _id: cal._id || cal.id, // Добавляем _id для API интеграций
       title: cal.title,
       description: cal.description || '',
       color: cal.color || '#3b82f6',
       is_default: cal.is_default || false,
       isShared: cal.owner?.toString() !== cal.creator?.toString(), // Определяем shared календарь
+      shared_with: cal.shared_with || [], // Добавляем для ShareCalendarDialog
     }));
   }, [calendarsData]);
 
@@ -101,6 +103,7 @@ export const CalendarContextWrapper = (props) => {
 
       return {
         id: event._id || event.id,
+        _id: event._id || event.id, // Добавляем _id для API интеграций
         title: event.title,
         description: event.description || '',
         day: new Date(event.start).getTime(),
@@ -108,6 +111,7 @@ export const CalendarContextWrapper = (props) => {
         endTime: dayjs(event.end).format('HH:mm'),
         calendarId: event.calendar?._id || event.calendar,
         color: calendar?.color || '#3b82f6', // Use calendar color
+        attendees: event.attendees || [], // Добавляем attendees для ShareEventDialog
       };
     });
 
@@ -294,6 +298,8 @@ export const CalendarContextWrapper = (props) => {
         calendars,
         visibleCalendarIds,
         toggleCalendarVisibility,
+        refetchCalendars,
+        refetchEvents,
       }}
     >
       {props.children}

@@ -2,6 +2,9 @@ import { Calendar } from '../../models/Calendar.js'
 import { Event } from '../../models/Event.js'
 import { Reminder } from '../../models/Reminder.js'
 import { User } from '../../models/User.js'
+import { Access } from '../../models/Access.js'
+import { EmailUtils } from '../../utils/EmailUtils.js'
+import mongoose from 'mongoose'
 
 class CalendarsService {
   /**
@@ -133,7 +136,7 @@ class CalendarsService {
   }
 
   /**
-   * Поделиться календарем с пользователем
+   * Поделиться календарем с пользователем (через Access модель)
    */
   async shareCalendar(calendarId, userId, shareData) {
     const { userEmail, permission } = shareData
@@ -146,9 +149,9 @@ class CalendarsService {
       throw error
     }
 
-    // Только владелец или администратор может делиться
-    if (!calendar.hasAccess(userId, 'admin')) {
-      const error = new Error('Access denied')
+    // Проверяем что текущий пользователь - владелец
+    if (calendar.owner.toString() !== userId.toString()) {
+      const error = new Error('Only calendar owner can share')
       error.status = 403
       throw error
     }
@@ -168,6 +171,31 @@ class CalendarsService {
       throw error
     }
 
+    // Создаем Access записи на основе permission
+    // read -> read
+    // write -> read, update
+    // admin -> read, update, delete, share
+    const accessTypes = {
+      read: ['read'],
+      write: ['read', 'update'],
+      admin: ['read', 'update', 'delete', 'share']
+    }
+
+    const typesToGrant = accessTypes[permission] || ['read']
+
+    // Создаем Access записи для каждого типа
+    for (const type of typesToGrant) {
+      const accessName = `calendar.${type}.${new mongoose.Types.ObjectId().toString()}`
+      await Access.grantAccess(
+        targetUser._id,
+        'calendar',
+        type,
+        calendar._id,
+        accessName
+      )
+    }
+
+    // Также добавляем в shared_with для обратной совместимости
     calendar.shareWith(targetUser._id, permission)
     await calendar.save()
 
@@ -175,11 +203,30 @@ class CalendarsService {
     targetUser.addCalendar(calendar._id)
     await targetUser.save()
 
-    return calendar
-  }
+    // Получаем владельца для email
+    const owner = await User.findById(userId)
 
-  /**
-   * Удалить доступ к календарю
+    // Отправляем email уведомление
+    try {
+      await EmailUtils.sendEmail({
+        to: targetUser.email,
+        subject: `${owner.login} shared a calendar with you`,
+        html: EmailUtils.generateCalendarShareEmail(
+          owner.login,
+          calendar.title,
+          permission
+        ),
+      })
+      console.log(`✅ Calendar share email sent to ${targetUser.email}`)
+      console.log(`✅ Access records created for ${targetUser.email}: ${typesToGrant.join(', ')}`)
+    } catch (emailError) {
+      console.error('❌ Failed to send calendar share email:', emailError.message)
+      // Не бросаем ошибку, календарь уже расшарен
+    }
+
+    return calendar
+  }  /**
+   * Удалить доступ к календарю (через Access модель)
    */
   async removeCalendarAccess(calendarId, userId, targetUserEmail) {
     const calendar = await Calendar.findById(calendarId)
@@ -190,9 +237,9 @@ class CalendarsService {
       throw error
     }
 
-    // Только владелец или администратор может удалять доступ
-    if (!calendar.hasAccess(userId, 'admin')) {
-      const error = new Error('Access denied')
+    // Только владелец может удалять доступ
+    if (calendar.owner.toString() !== userId.toString()) {
+      const error = new Error('Only calendar owner can remove access')
       error.status = 403
       throw error
     }
@@ -204,12 +251,26 @@ class CalendarsService {
       throw error
     }
 
+    // Удаляем ВСЕ Access записи для этого пользователя и календаря
+    const accessTypes = ['read', 'update', 'delete', 'share']
+    for (const type of accessTypes) {
+      await Access.revokeAccess(
+        targetUser._id,
+        'calendar',
+        type,
+        calendar._id
+      )
+    }
+
+    // Также удаляем из shared_with для обратной совместимости
     calendar.removeSharedAccess(targetUser._id)
     await calendar.save()
 
     // Удаляем календарь из списка пользователя
     targetUser.removeCalendar(calendar._id)
     await targetUser.save()
+
+    console.log(`✅ All access records removed for ${targetUser.email} on calendar ${calendar.title}`)
 
     return calendar
   }

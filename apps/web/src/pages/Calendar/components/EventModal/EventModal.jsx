@@ -1,12 +1,14 @@
 import React, { useContext, useState, useEffect, useRef } from "react";
 import { CalendarContext } from "@shared/context/CalendarContext";
+import { useAuth } from "@shared/context/AuthContext";
 import { Button } from "@shared/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@shared/ui/dialog";
 import { Input } from "@shared/ui/input";
 import { Label } from "@shared/ui/label";
 import { Textarea } from "@shared/ui/textarea";
-import { Clock, Trash2, GripVertical, Calendar, Share2 } from "lucide-react";
+import { Clock, Trash2, GripVertical, Calendar, Share2, Check, X } from "lucide-react";
 import { ShareEventDialog } from "@features/Events/ShareEvent/ShareEventDialog";
+import { EventApi } from "@entities/Event/api/EventApi";
 import { toast } from "sonner";
 import {
   Select,
@@ -26,8 +28,10 @@ export const EventModal = () => {
     selectedEvent,
     calendars,
     defaultCalendarId,
+    refetchEvents,
   } = useContext(CalendarContext);
 
+  const { user } = useAuth();
   const [title, setTitle] = useState(selectedEvent ? selectedEvent.title : "");
   const [description, setDescription] = useState(
     selectedEvent ? selectedEvent.description : ""
@@ -38,6 +42,7 @@ export const EventModal = () => {
     selectedEvent?.calendarId || defaultCalendarId
   );
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Состояния для перетаскивания
   const [isDragging, setIsDragging] = useState(false);
@@ -133,6 +138,45 @@ export const EventModal = () => {
     setSelectedEvent(null);
   }
 
+  // Проверяем является ли текущий пользователь attendee (не organizer)
+  const myAttendeeStatus = React.useMemo(() => {
+    if (!selectedEvent?.attendees || !user) return null;
+
+    const attendee = selectedEvent.attendees.find(a => {
+      const attendeeUserId = a.user?._id || a.user;
+      return attendeeUserId?.toString() === user._id?.toString();
+    });
+
+    return attendee ? attendee.status : null;
+  }, [selectedEvent, user]);
+
+  const isAttendee = myAttendeeStatus !== null;
+
+  async function handleUpdateMyStatus(status) {
+    if (!selectedEvent) return;
+
+    const eventId = selectedEvent._id || selectedEvent.id;
+    if (!eventId) {
+      toast.error('Event ID is missing');
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      await EventApi.updateMyStatus(eventId, status);
+      toast.success(`Status updated to ${status}`);
+
+      // Refetch events to update the UI
+      await refetchEvents();
+      setShowEventModal(false);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error(error.response?.data?.message || 'Failed to update status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
   function handleDelete() {
     dispatchCalEvent({ type: "delete", payload: selectedEvent });
     // Toast показывается в useDeleteEvent хуке
@@ -187,6 +231,7 @@ export const EventModal = () => {
               onChange={(e) => setTitle(e.target.value)}
               className="text-base"
               autoFocus
+              disabled={isAttendee}
             />
           </div>
 
@@ -209,6 +254,7 @@ export const EventModal = () => {
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
                   className="mt-1"
+                  disabled={isAttendee}
                 />
               </div>
               <div>
@@ -221,6 +267,7 @@ export const EventModal = () => {
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
                   className="mt-1"
+                  disabled={isAttendee}
                 />
               </div>
             </div>
@@ -237,6 +284,7 @@ export const EventModal = () => {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="resize-none"
+              disabled={isAttendee}
             />
           </div>
 
@@ -245,7 +293,7 @@ export const EventModal = () => {
               <Calendar className="h-4 w-4" />
               Calendar
             </Label>
-            <Select value={selectedCalendarId} onValueChange={setSelectedCalendarId}>
+            <Select value={selectedCalendarId} onValueChange={setSelectedCalendarId} disabled={isAttendee}>
               <SelectTrigger>
                 <div className="flex items-center gap-2">
                   {selectedCalendarId && (
@@ -279,7 +327,7 @@ export const EventModal = () => {
           </div>
 
           <DialogFooter className="pt-4">
-            {selectedEvent && (
+            {selectedEvent && !isAttendee && (
               <Button
                 type="button"
                 variant="destructive"
@@ -290,6 +338,39 @@ export const EventModal = () => {
                 Delete
               </Button>
             )}
+
+            {/* Кнопки для attendee */}
+            {isAttendee && myAttendeeStatus === 'invited' && (
+              <div className="flex gap-2 mr-auto">
+                <Button
+                  type="button"
+                  variant="default"
+                  onClick={() => handleUpdateMyStatus('accepted')}
+                  disabled={updatingStatus}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Accept
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleUpdateMyStatus('declined')}
+                  disabled={updatingStatus}
+                  className="text-red-600 border-red-600 hover:bg-red-50"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Decline
+                </Button>
+              </div>
+            )}
+
+            {isAttendee && myAttendeeStatus !== 'invited' && (
+              <div className="mr-auto text-sm text-gray-600">
+                Status: <span className="font-medium capitalize">{myAttendeeStatus}</span>
+              </div>
+            )}
+
             <Button
               type="button"
               variant="outline"
@@ -300,9 +381,12 @@ export const EventModal = () => {
             >
               Cancel
             </Button>
-            <Button type="submit">
-              {selectedEvent ? "Update Event" : "Create Event"}
-            </Button>
+
+            {!isAttendee && (
+              <Button type="submit">
+                {selectedEvent ? "Update Event" : "Create Event"}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

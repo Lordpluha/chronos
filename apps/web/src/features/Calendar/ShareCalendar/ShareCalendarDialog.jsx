@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@shared/ui/dialog';
 import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
@@ -8,8 +8,10 @@ import { Switch } from '@shared/ui/switch';
 import { Copy, Mail, Link2, Users, Trash2, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CalendarApi } from '@entities/Calendar/api/CalendarApi';
+import { CalendarContext } from '@shared/context/CalendarContext';
 
 export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
+  const { refetchCalendars, refetchEvents } = useContext(CalendarContext);
   const [email, setEmail] = useState('');
   const [permission, setPermission] = useState('read');
   const [publicLink, setPublicLink] = useState('');
@@ -38,14 +40,16 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
       return;
     }
 
-    if (!calendar?._id) {
+    const calendarId = calendar?._id || calendar?.id;
+    if (!calendarId) {
       toast.error('Calendar ID is missing');
+      console.error('Calendar object:', calendar);
       return;
     }
 
     setLoading(true);
     try {
-      const response = await CalendarApi.share(calendar._id, {
+      const response = await CalendarApi.share(calendarId, {
         userEmail: email,
         permission: permission,
       });
@@ -61,6 +65,11 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
       setSharedWith([...sharedWith, newShare]);
       setEmail('');
       toast.success(`Calendar shared with ${email}`);
+
+      // Refetch calendars and events for the target user
+      console.log('🔄 Calendar shared, refetching data...');
+      await refetchCalendars();
+      await refetchEvents();
     } catch (error) {
       console.error('Error sharing calendar:', error);
       toast.error(error.response?.data?.message || 'Failed to share calendar');
@@ -70,19 +79,25 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   };
 
   const handleRemoveShare = async (shareItem) => {
-    if (!calendar?._id) {
+    const calendarId = calendar?._id || calendar?.id;
+    if (!calendarId) {
       toast.error('Calendar ID is missing');
       return;
     }
 
     setLoading(true);
     try {
-      await CalendarApi.removeAccess(calendar._id, {
+      await CalendarApi.removeAccess(calendarId, {
         userEmail: shareItem.email,
       });
 
       setSharedWith(sharedWith.filter(s => s.id !== shareItem.id));
       toast.success('Access removed');
+
+      // Refetch data after removing access
+      console.log('🔄 Access removed, refetching data...');
+      await refetchCalendars();
+      await refetchEvents();
     } catch (error) {
       console.error('Error removing access:', error);
       toast.error(error.response?.data?.message || 'Failed to remove access');
@@ -92,7 +107,8 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   };
 
   const handleCopyLink = () => {
-    const link = publicLink || `https://chronos.app/calendar/${calendar?.id}`;
+    const calendarId = calendar?._id || calendar?.id;
+    const link = publicLink || `${window.location.origin}/calendar?cal=${calendarId}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     toast.success('Link copied to clipboard');
@@ -102,8 +118,9 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   const handleTogglePublic = (checked) => {
     setIsPublic(checked);
     if (checked) {
+      const calendarId = calendar?._id || calendar?.id;
       // TODO: Generate public link
-      setPublicLink(`https://chronos.app/calendar/${calendar?.id}`);
+      setPublicLink(`${window.location.origin}/calendar?cal=${calendarId}`);
       toast.success('Public link generated');
     } else {
       setPublicLink('');

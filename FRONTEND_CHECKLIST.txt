@@ -131,13 +131,17 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [x] Или использовать цвет календаря
     [x] src/shared/ui/ColorPicker.jsx
 
-[ ] 2.5. Attendees (участники)
-    [ ] src/entities/Event/ui/AttendeesList.jsx
-    [ ] Добавление участников по email
-    [ ] Статусы: accepted/declined/pending
-    [ ] Удаление участников
-    [ ] Использовать EventApi.addAttendee()
-    [ ] Использовать EventApi.removeAttendee()
+[x] 2.5. Attendees (участники) - ПОЛНОСТЬЮ ГОТОВО
+    [x] ShareEventDialog для управления участниками
+    [x] Добавление участников по email
+    [x] Статусы: invited/accepted/declined/maybe
+    [x] Удаление участников
+    [x] Использовать EventApi.addAttendee()
+    [x] Использовать EventApi.removeAttendee()
+    [x] Access модель для прав доступа
+    [x] Email уведомления через MailTrap
+    [x] Populate attendees.user при загрузке
+    [x] Refetch calendars/events после share
 
 
 
@@ -176,19 +180,22 @@ UI КОМПОНЕНТЫ (shadcn/ui - ГОТОВО)
     [ ] Можно использовать: https://date.nager.at/Api
     [ ] Отображать праздники другим стилем
 
-[x] 3.6. Sharing календарей (ГОТОВО С API ИНТЕГРАЦИЕЙ)
-    [x] src/features/Calendar/ShareCalendar/ShareCalendarDialog.jsx
-    [x] Кнопка "Share" в CalendarFormDialog
-    [x] Кнопка "Share" в CalendarsTab (Account Settings)
+[x] 3.6. Sharing календарей - ПОЛНОСТЬЮ ГОТОВО
+    [x] ShareCalendarDialog для управления доступом
     [x] Приглашение по email
     [x] Права: read / write / admin
-    [x] Публичная ссылка (UI готова, backend TODO)
+    [x] Публичная ссылка (localhost:5173/calendar?cal=ID)
     [x] Список людей с доступом
     [x] Удаление доступа
     [x] CalendarApi.share() - интегрировано
     [x] CalendarApi.removeAccess() - интегрировано
     [x] Loading состояния
     [x] Error handling с toast уведомлениями
+    [x] Access модель для прав доступа
+    [x] Email уведомления через MailTrap
+    [x] Refetch calendars/events после share
+    [x] Shared календари показывают все события
+    [x] targetUser.addCalendar() добавляет календарь в user.calendars
 
 
 ================================================================================

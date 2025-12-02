@@ -1,4 +1,5 @@
 import React, { useState, useContext, useEffect } from "react";
+import { useSearchParams } from "react-router";
 import { CalendarHeader } from "../components/CalendarHeader";
 import { Sidebar } from "../components/Sidebar";
 import { Month } from "../components/Month";
@@ -12,13 +13,42 @@ import { CalendarContext } from "@shared/context/CalendarContext";
 import { EventModal } from "../components/EventModal";
 
 export function CalendarPage() {
-  const { monthIndex, showEventModal, viewMode, isLoadingEvents, eventsError } = useContext(CalendarContext);
+  const { monthIndex, showEventModal, viewMode, isLoadingEvents, eventsError, setShowEventModal, setSelectedEvent, savedEvents } = useContext(CalendarContext);
   const { settings } = useCalendarSettings();
   const [currentMonth, setCurrentMonth] = useState(getMonth(monthIndex, settings.weekStartsOn));
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     setCurrentMonth(getMonth(monthIndex, settings.weekStartsOn));
   }, [monthIndex, settings.weekStartsOn]);
+
+  // Открываем событие из URL параметра ?event=ID
+  useEffect(() => {
+    const eventId = searchParams.get('event');
+    const calendarId = searchParams.get('cal');
+
+    if (eventId && savedEvents && savedEvents.length > 0) {
+      const event = savedEvents.find(e => e.id === eventId || e._id === eventId);
+      if (event) {
+        console.log('📅 Opening event from URL:', event);
+        setSelectedEvent(event);
+        setShowEventModal(true);
+        // Очищаем query параметр после открытия
+        searchParams.delete('event');
+        setSearchParams(searchParams, { replace: true });
+      } else {
+        console.warn('⚠️ Event not found:', eventId);
+      }
+    }
+
+    if (calendarId) {
+      console.log('📆 Calendar link opened:', calendarId);
+      // Очищаем query параметр
+      searchParams.delete('cal');
+      setSearchParams(searchParams, { replace: true });
+      // TODO: Можно добавить логику для выбора календаря в sidebar
+    }
+  }, [searchParams, savedEvents, setSelectedEvent, setShowEventModal, setSearchParams]);
 
   if (isLoadingEvents) {
     return (

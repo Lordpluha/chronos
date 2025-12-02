@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@shared/ui/dialog';
 import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Copy, Mail, UserPlus, Trash2, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EventApi } from '@entities/Event/api/EventApi';
+import { CalendarContext } from '@shared/context/CalendarContext';
 
 export function ShareEventDialog({ open, onOpenChange, event }) {
+  const { refetchCalendars, refetchEvents } = useContext(CalendarContext);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
   const [copied, setCopied] = useState(false);
@@ -17,17 +19,26 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
 
   // Load existing attendees from event object
   useEffect(() => {
-    if (event?.attendees) {
-      const mappedAttendees = event.attendees.map((attendee, index) => ({
-        id: attendee._id || index,
-        email: attendee.email,
-        role: attendee.role || 'participant',
-        status: attendee.status || 'pending',
-        avatar: attendee.email?.[0]?.toUpperCase() || '?',
-      }));
+    if (event?.attendees && Array.isArray(event.attendees)) {
+      const mappedAttendees = event.attendees.map((attendee, index) => {
+        // attendee может быть либо с user (ObjectId или populated), либо с email
+        const userEmail = attendee.user?.email || attendee.email;
+        const userId = attendee.user?._id || attendee.user;
+
+        return {
+          id: userId || attendee._id || index,
+          email: userEmail,
+          role: attendee.role || 'participant',
+          status: attendee.status || 'invited',
+          avatar: userEmail?.[0]?.toUpperCase() || '?',
+        };
+      });
       setAttendees(mappedAttendees);
+      console.log('📋 Loaded attendees:', mappedAttendees);
+    } else {
+      setAttendees([]);
     }
-  }, [event]);
+  }, [event, event?.attendees]);
 
   const handleInvite = async () => {
     if (!email) {
@@ -35,14 +46,16 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
       return;
     }
 
-    if (!event?._id) {
+    const eventId = event?._id || event?.id;
+    if (!eventId) {
       toast.error('Event ID is missing');
+      console.error('Event object:', event);
       return;
     }
 
     setLoading(true);
     try {
-      await EventApi.addAttendee(event._id, {
+      await EventApi.addAttendee(eventId, {
         email,
         role,
       });
@@ -58,6 +71,11 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
       setAttendees([...attendees, newAttendee]);
       setEmail('');
       toast.success(`Invitation sent to ${email}`);
+
+      // Refetch data so target user sees the calendar and event
+      console.log('🔄 Attendee added, refetching data...');
+      await refetchCalendars();
+      await refetchEvents();
     } catch (error) {
       console.error('Error inviting attendee:', error);
       toast.error(error.response?.data?.message || 'Failed to invite attendee');
@@ -67,17 +85,23 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
   };
 
   const handleRemoveAttendee = async (attendee) => {
-    if (!event?._id) {
+    const eventId = event?._id || event?.id;
+    if (!eventId) {
       toast.error('Event ID is missing');
       return;
     }
 
     setLoading(true);
     try {
-      await EventApi.removeAttendee(event._id, attendee.id);
+      await EventApi.removeAttendee(eventId, attendee.id);
 
       setAttendees(attendees.filter(a => a.id !== attendee.id));
       toast.success('Attendee removed');
+
+      // Refetch data after removing attendee
+      console.log('🔄 Attendee removed, refetching data...');
+      await refetchCalendars();
+      await refetchEvents();
     } catch (error) {
       console.error('Error removing attendee:', error);
       toast.error(error.response?.data?.message || 'Failed to remove attendee');
@@ -87,7 +111,9 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
   };
 
   const handleCopyEventLink = () => {
-    const link = `https://chronos.app/event/${event?.id}`;
+    const eventId = event?._id || event?.id;
+    // Используем текущий origin (localhost:5173 или production URL)
+    const link = `${window.location.origin}/calendar?event=${eventId}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     toast.success('Event link copied');
@@ -213,7 +239,7 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
             <div className="flex gap-2">
               <Input
                 readOnly
-                value={`https://chronos.app/event/${event?.id || 'xxx'}`}
+                value={`${window.location.origin}/calendar?event=${event?._id || event?.id || 'xxx'}`}
                 className="font-mono text-sm"
               />
               <Button

@@ -227,7 +227,9 @@ const eventSchema = new mongoose.Schema(
           query.where('start', dateFilter)
         }
 
-        return query.populate('creator organizer calendar')
+        return query
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**
@@ -235,9 +237,9 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       findByCreator(creatorId) {
-        return this.find({ creator: creatorId }).populate(
-          'creator organizer calendar',
-        )
+        return this.find({ creator: creatorId })
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**
@@ -245,9 +247,9 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       findByOrganizer(organizerId) {
-        return this.find({ organizer: organizerId }).populate(
-          'creator organizer calendar',
-        )
+        return this.find({ organizer: organizerId })
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**

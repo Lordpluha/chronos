@@ -111,6 +111,7 @@ export const updateEventSchema = z.object({
 export const addAttendeeSchema = z.object({
   user_id: z.string().optional(),
   email: z.string().email().optional(),
+  role: z.enum(['organizer', 'participant', 'viewer']).optional().default('participant'),
 }).refine((data) => data.user_id || data.email, {
   message: 'Either user_id or email is required',
   path: ['user_id'],

@@ -1,5 +1,9 @@
 import { Event } from '../../models/Event.js'
 import { Calendar } from '../../models/Calendar.js'
+import { User } from '../../models/User.js'
+import { Access } from '../../models/Access.js'
+import { EmailUtils } from '../../utils/EmailUtils.js'
+import mongoose from 'mongoose'
 
 class EventsService {
   /**
@@ -109,31 +113,42 @@ class EventsService {
   }
 
   /**
-   * Получить события пользователя
+   * Получить события пользователя (включая из shared календарей)
    */
   async getUserEvents(userId, query = {}) {
     const { startDate, endDate, status } = query
 
-    let events
-
-    if (startDate && endDate) {
-      events = await Event.findInDateRange(new Date(startDate), new Date(endDate))
-    } else {
-      events = await Event.findByAttendee(userId)
+    // Получаем все календари пользователя (включая shared)
+    const user = await User.findById(userId).populate('calendars')
+    if (!user) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
     }
 
-    // Фильтруем события по доступу пользователя
-    events = events.filter((event) => {
-      if (event.calendar && typeof event.calendar !== 'string') {
-        return event.calendar.hasAccess(userId)
+    const calendarIds = user.calendars.map(cal => cal._id)
+
+    let events = []
+
+    // Загружаем события из всех календарей пользователя
+    if (calendarIds.length > 0) {
+      const query = { calendar: { $in: calendarIds } }
+
+      if (startDate && endDate) {
+        query.start = { $gte: new Date(startDate), $lte: new Date(endDate) }
       }
-      return false
-    })
+
+      events = await Event.find(query)
+        .populate('creator organizer calendar')
+        .populate('attendees.user')
+        .sort({ start: 1 })
+    }
 
     if (status) {
       events = events.filter((event) => event.status === status)
     }
 
+    console.log(`📊 Loaded ${events.length} events for user from ${calendarIds.length} calendars`)
     return events
   }
 
@@ -289,7 +304,7 @@ class EventsService {
   }
 
   /**
-   * Добавить участника к событию
+   * Добавить участника к событию (через Access модель)
    */
   async addAttendee(eventId, userId, attendeeData) {
     const event = await Event.findById(eventId).populate('calendar')
@@ -306,19 +321,123 @@ class EventsService {
       throw error
     }
 
-    const { user_id, email } = attendeeData
+    const { user_id, email, role } = attendeeData
+    // NOTE: role используется для определения прав доступа через Access модель
 
-    if (user_id) {
-      event.addAttendee(user_id, true)
-    } else if (email) {
-      event.addAttendee(email, false)
-    } else {
+    let targetUserId = user_id
+    let targetEmail = email
+
+    // Если передан email, пытаемся найти пользователя
+    if (email && !user_id) {
+      const targetUser = await User.findByEmail(email)
+      if (targetUser) {
+        targetUserId = targetUser._id
+        targetEmail = targetUser.email
+      } else {
+        // Пользователь не найден, но можем добавить по email
+        console.log(`⚠️ User not found for email: ${email}, adding as external attendee`)
+      }
+    }
+
+    // Если есть userId, получаем email
+    if (user_id && !email) {
+      const targetUser = await User.findById(user_id)
+      if (targetUser) {
+        targetEmail = targetUser.email
+      } else {
+        const error = new Error('User not found')
+        error.status = 404
+        throw error
+      }
+    }
+
+    if (!targetUserId && !targetEmail) {
       const error = new Error('Either user_id or email is required')
       error.status = 400
       throw error
     }
 
+    // Определяем права доступа на основе роли
+    // organizer -> read, update, delete, share
+    // participant -> read, update (может обновить свой статус)
+    // viewer -> read
+    const accessRights = {
+      organizer: ['read', 'update', 'delete', 'share'],
+      participant: ['read', 'update'],
+      viewer: ['read']
+    }
+
+    const typesToGrant = accessRights[role] || accessRights.participant
+
+    // Создаем Access записи если есть userId
+    if (targetUserId) {
+      for (const type of typesToGrant) {
+        const accessName = `event.${type}.${new mongoose.Types.ObjectId().toString()}`
+        await Access.grantAccess(
+          targetUserId,
+          'event',
+          type,
+          event._id,
+          accessName
+        )
+      }
+      console.log(`✅ Access records created for event attendee: ${typesToGrant.join(', ')}`)
+
+      // Даем доступ к календарю, в котором находится событие
+      const targetUser = await User.findById(targetUserId)
+      if (targetUser && event.calendar) {
+        // Проверяем, есть ли уже доступ к календарю
+        if (!targetUser.calendars.includes(event.calendar._id)) {
+          // Даем read доступ к календарю через Access
+          const calendarAccessName = `calendar.read.${new mongoose.Types.ObjectId().toString()}`
+          await Access.grantAccess(
+            targetUserId,
+            'calendar',
+            'read',
+            event.calendar._id,
+            calendarAccessName
+          )
+
+          // Добавляем календарь в список пользователя
+          targetUser.addCalendar(event.calendar._id)
+          await targetUser.save()
+          console.log(`✅ Calendar access granted to: ${targetEmail}`)
+        }
+      }
+    }
+
+    // Добавляем участника в событие
+    if (targetUserId) {
+      event.addAttendee(targetUserId, true)
+    } else if (targetEmail) {
+      event.addAttendee(targetEmail, false)
+    }
+
     await event.save()
+
+    // Отправляем email приглашение
+    try {
+      const organizer = await User.findById(userId)
+
+      if (targetEmail && organizer) {
+        await EmailUtils.sendEmail({
+          to: targetEmail,
+          subject: `You're invited to: ${event.title}`,
+          html: EmailUtils.generateEventInviteEmail(
+            organizer.login,
+            event.title,
+            event.start,
+            event.end,
+            role || 'participant'
+          ),
+        })
+        console.log(`✅ Event invite email sent to ${targetEmail}`)
+      }
+    } catch (emailError) {
+      console.error('❌ Failed to send event invite email:', emailError.message)
+      // Не бросаем ошибку, участник уже добавлен
+    }
+
     return event
   }
 
@@ -341,7 +460,7 @@ class EventsService {
   }
 
   /**
-   * Удалить участника
+   * Удалить участника (и его Access записи)
    */
   async removeAttendee(eventId, userId, attendeeId) {
     const event = await Event.findById(eventId).populate('calendar')
@@ -358,8 +477,21 @@ class EventsService {
       throw error
     }
 
+    // Удаляем ВСЕ Access записи для этого участника и события
+    const accessTypes = ['read', 'update', 'delete', 'share']
+    for (const type of accessTypes) {
+      await Access.revokeAccess(
+        attendeeId,
+        'event',
+        type,
+        event._id
+      )
+    }
+
     event.removeAttendee(attendeeId, true)
     await event.save()
+
+    console.log(`✅ All access records removed for attendee on event ${event.title}`)
 
     return event
   }

@@ -35,12 +35,16 @@ const accessSchema = new mongoose.Schema(
       trim: true,
       validate: {
         validator: (value) => {
-          // Format: {controls}.{type}.{uuid}
-          const pattern =
+          // Format: {controls}.{type}.{uuid or objectId}
+          // UUID: 8-4-4-4-12 hex digits
+          // ObjectId: 24 hex digits
+          const uuidPattern =
             /^(calendar|event|reminder|task)\.(create|read|update|delete|share)\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          return pattern.test(value)
+          const objectIdPattern =
+            /^(calendar|event|reminder|task)\.(create|read|update|delete|share)\.[0-9a-f]{24}$/i
+          return uuidPattern.test(value) || objectIdPattern.test(value)
         },
-        message: 'Name must follow format: {controls}.{type}.{uuid}',
+        message: 'Name must follow format: {controls}.{type}.{uuid or objectId}',
       },
     },
   },

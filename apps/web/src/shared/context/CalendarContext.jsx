@@ -19,4 +19,6 @@ export const CalendarContext = createContext({
   isLoadingEvents: false,
   eventsError: null,
   defaultCalendarId: null,
+  refetchCalendars: () => {},
+  refetchEvents: () => {},
 });
