@@ -65,8 +65,8 @@ const calendarSchema = new mongoose.Schema(
         },
         permission: {
           type: String,
-          enum: ['read', 'write', 'admin'],
-          default: 'read',
+          enum: ['viewer', 'admin', 'owner', 'read', 'write'], // Поддержка старых и новых значений
+          default: 'viewer',
         },
         shared_at: {
           type: Date,

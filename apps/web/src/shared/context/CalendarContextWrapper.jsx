@@ -60,6 +60,8 @@ export const CalendarContextWrapper = (props) => {
       is_default: cal.is_default || false,
       isShared: cal.owner?.toString() !== cal.creator?.toString(), // Определяем shared календарь
       shared_with: cal.shared_with || [], // Добавляем для ShareCalendarDialog
+      creator: cal.creator, // Добавляем creator для ShareCalendarDialog
+      owner: cal.owner, // Добавляем owner для ShareCalendarDialog
     }));
   }, [calendarsData]);
 
@@ -117,6 +119,8 @@ export const CalendarContextWrapper = (props) => {
         calendarId: calendarId,
         color: calendarColor, // Use calendar color or default
         attendees: event.attendees || [], // Добавляем attendees для ShareEventDialog
+        creator: event.creator, // Добавляем информацию о создателе
+        organizer: event.organizer, // Добавляем информацию об организаторе
       };
     });
 

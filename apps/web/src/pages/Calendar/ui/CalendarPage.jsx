@@ -31,21 +31,16 @@ export function CalendarPage() {
     const calendarId = searchParams.get('cal');
     const action = searchParams.get('action'); // Проверяем action=accept
 
-    console.log('🔍 useEffect triggered:', { eventId, calendarId, action, isRefetchingFromUrl, processedEventId, savedEventsCount: savedEvents?.length });
-
     // Пропускаем если уже обрабатываем
     if (isRefetchingFromUrl) {
-      console.log('⏳ Already refetching, skipping...');
       return;
     }
 
     // Если есть eventId и мы еще не начали загрузку
     if (eventId && !processedEventId) {
-      console.log('🔄 Starting refetch for event:', eventId);
       setIsRefetchingFromUrl(true);
       setProcessedEventId(eventId); // Помечаем как обрабатываемый
       Promise.all([refetchCalendars(), refetchEvents()]).then(() => {
-        console.log('✅ Data refetched, now looking for event...');
         setIsRefetchingFromUrl(false);
         // НЕ сбрасываем processedEventId - пусть следующий useEffect обработает событие
       }).catch(error => {
@@ -58,11 +53,8 @@ export function CalendarPage() {
 
     // Если уже загрузили данные и есть eventId
     if (eventId && processedEventId === eventId && savedEvents && savedEvents.length > 0) {
-      console.log(`🔍 Looking for event ${eventId} in ${savedEvents.length} events`);
       const event = savedEvents.find(e => e.id === eventId || e._id === eventId);
       if (event) {
-        console.log('📅 Event found from URL:', event.title);
-        console.log('✅ Event will be displayed in calendar view');
         // НЕ открываем модалку, просто очищаем URL
         // Событие уже в календаре благодаря filteredEvents
         searchParams.delete('event');
@@ -70,21 +62,14 @@ export function CalendarPage() {
         setSearchParams(searchParams, { replace: true });
         setProcessedEventId(null); // Сбрасываем после успешной обработки
       } else {
-        console.warn('⚠️ Event not found in savedEvents:', eventId);
-        console.log('Available event IDs:', savedEvents.map(e => e.id || e._id).join(', '));
         // Попробуем загрузить событие напрямую через API
         import('@entities/Event/api/EventApi').then(({ EventApi }) => {
-          console.log('📡 Loading event directly from API...');
           EventApi.getById(eventId)
             .then(async (eventData) => {
-              console.log('✅ Event loaded directly from API:', eventData);
-
               // Если есть action=accept, принимаем приглашение
               if (action === 'accept') {
                 try {
-                  console.log('✅ Accepting event invitation...');
                   await EventApi.updateMyStatus(eventId, 'accepted');
-                  console.log('✅ Invitation accepted, refetching events...');
 
                   // Перезагружаем события чтобы получить обновленный список
                   await refetchEvents();
@@ -111,7 +96,6 @@ export function CalendarPage() {
                 }
               } else {
                 // Просто показываем что событие доступно
-                console.log('ℹ️ Event is accessible');
                 searchParams.delete('event');
                 setSearchParams(searchParams, { replace: true });
                 setProcessedEventId(null);
@@ -134,23 +118,17 @@ export function CalendarPage() {
     }
 
     if (calendarId && !processedEventId && !processedCalendarId) {
-      console.log('📆 Calendar link opened:', calendarId);
       setProcessedCalendarId(calendarId); // Помечаем как обрабатываемый
 
       // Попытка загрузить календарь и подписаться на него
       import('@entities/Calendar/api/CalendarApi').then(({ CalendarApi }) => {
-        console.log('📡 Loading calendar directly from API...');
         CalendarApi.getById(calendarId)
           .then(async (calendarData) => {
-            console.log('✅ Calendar loaded directly from API:', calendarData);
-
             // Автоматически подписываемся на календарь
             try {
-              console.log('👤 Subscribing current user to calendar...');
               await CalendarApi.subscribe(calendarId, {
                 permission: 'read'  // Только на чтение
               });
-              console.log('✅ User subscribed to calendar, refetching calendars...');
 
               // Перезагружаем календари чтобы получить обновленный список
               await refetchCalendars();
@@ -188,8 +166,8 @@ export function CalendarPage() {
           });
       });
     }
-  }, [searchParams, savedEvents, setSelectedEvent, setShowEventModal, setSearchParams, isRefetchingFromUrl, processedEventId]);
-  // НЕ включаем refetchCalendars и refetchEvents в зависимости!
+  }, [searchParams, setSelectedEvent, setShowEventModal, setSearchParams, isRefetchingFromUrl, processedEventId, processedCalendarId]);
+  // НЕ включаем refetchCalendars, refetchEvents и savedEvents в зависимости!
 
   if (isLoadingEvents || isRefetchingFromUrl) {
     return (

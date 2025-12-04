@@ -351,6 +351,13 @@ export const EventModal = () => {
                 ))}
               </SelectContent>
             </Select>
+            {selectedEvent?.creator && (
+              <div className="mt-2 text-xs text-gray-500">
+                Created by: <span className="font-medium text-gray-700">
+                  {selectedEvent.creator.login || selectedEvent.creator.email}
+                </span>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-4">

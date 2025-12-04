@@ -21,7 +21,7 @@ export const updateCalendarSchema = z.object({
 
 export const shareCalendarSchema = z.object({
   userEmail: z.string().email('Invalid email format'),
-  permission: z.enum(['read', 'write', 'admin']).default('read'),
+  permission: z.enum(['viewer', 'admin', 'owner', 'read', 'write']).default('viewer'), // Поддержка старых и новых значений
 })
 
 export const removeAccessSchema = z.object({
@@ -30,7 +30,7 @@ export const removeAccessSchema = z.object({
 
 export const updateAccessSchema = z.object({
   userEmail: z.string().email('Invalid email format'),
-  permission: z.enum(['read', 'write', 'admin']),
+  permission: z.enum(['viewer', 'admin', 'owner', 'read', 'write']), // Поддержка старых и новых значений
 })
 
 // Валидация для событий

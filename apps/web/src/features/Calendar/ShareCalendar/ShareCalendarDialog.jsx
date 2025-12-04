@@ -21,7 +21,7 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   const { refetchCalendars, refetchEvents } = useContext(CalendarContext);
   const { user: currentUser } = useAuth();
   const [email, setEmail] = useState('');
-  const [permission, setPermission] = useState('read');
+  const [permission, setPermission] = useState('viewer');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sharedWith, setSharedWith] = useState([]);
@@ -36,11 +36,17 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
         const name = userObj?.name || email.split('@')[0];
         const userId = userObj?._id || share.user;
 
+        // Маппинг старых значений на новые
+        let mappedPermission = share.permission || 'viewer';
+        if (mappedPermission === 'read') mappedPermission = 'viewer';
+        if (mappedPermission === 'write') mappedPermission = 'admin'; // write больше нет, делаем admin
+        // owner остается owner
+
         return {
           id: share._id || index,
           email: email,
           name: name,
-          permission: share.permission || 'read',
+          permission: mappedPermission,
           avatar: email !== 'Unknown User' ? email[0]?.toUpperCase() : '?',
           userId: userId,
         };
@@ -48,9 +54,7 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
 
       setSharedWith(shares);
     }
-  }, [calendar]);
-
-  const handleShare = async () => {
+  }, [calendar]);  const handleShare = async () => {
     if (!email) {
       toast.error('Please enter an email');
       return;
@@ -163,9 +167,9 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="read">View only</SelectItem>
-                  <SelectItem value="write">Can edit</SelectItem>
-                  <SelectItem value="admin">Full access</SelectItem>
+                  <SelectItem value="viewer">Viewer</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleShare} disabled={loading}>
@@ -180,21 +184,25 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
 
             {/* List of shared users */}
             <div className="space-y-2 mt-4">
-              <Label className="text-xs text-gray-500">People with access</Label>
+              <Label className="text-xs text-gray-500">
+                People with access ({sharedWith.length + (calendar?.creator ? 1 : 0)})
+              </Label>
 
-              {/* Owner/Creator */}
-              {calendar?.owner && (
+              {/* Calendar Creator */}
+              {calendar?.creator && (
                 <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
-                      {calendar.owner?.email?.[0]?.toUpperCase() || 'O'}
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
+                      {calendar.creator?.email?.[0]?.toUpperCase() || 'C'}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{calendar.owner?.email || 'Owner'}</p>
+                        <p className="text-sm font-medium">{calendar.creator?.email || 'Creator'}</p>
                         <Crown className="h-3.5 w-3.5 text-amber-500" />
                       </div>
-                      <p className="text-xs text-gray-500">Owner • Full control</p>
+                      <span className="text-xs text-gray-500">
+                        Creator • Organizer
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -204,15 +212,15 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
               {sharedWith.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between p-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
                       {user.avatar}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{user.name || user.email}</p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mt-1">
                         <Select
                           value={user.permission}
                           onValueChange={async (newPermission) => {
@@ -240,27 +248,18 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                           }}
                           disabled={loading}
                         >
-                          <SelectTrigger className="w-[110px] h-7 text-xs">
+                          <SelectTrigger className="w-[100px] h-6 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="read">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">Viewer</span>
-                                <span className="text-xs text-gray-500">Can only view</span>
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="write">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">Editor</span>
-                                <span className="text-xs text-gray-500">Can edit events</span>
-                              </div>
+                            <SelectItem value="viewer">
+                              <span className="text-xs">Viewer</span>
                             </SelectItem>
                             <SelectItem value="admin">
-                              <div className="flex flex-col items-start">
-                                <span className="font-medium">Admin</span>
-                                <span className="text-xs text-gray-500">Full control</span>
-                              </div>
+                              <span className="text-xs">Admin</span>
+                            </SelectItem>
+                            <SelectItem value="owner">
+                              <span className="text-xs">Owner</span>
                             </SelectItem>
                           </SelectContent>
                         </Select>
@@ -283,7 +282,7 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                 </div>
               ))}
 
-              {sharedWith.length === 0 && !calendar?.owner && (
+              {sharedWith.length === 0 && !calendar?.creator && (
                 <p className="text-sm text-gray-500 text-center py-4">
                   No one has access yet. Share to collaborate!
                 </p>

@@ -26,11 +26,13 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
         // attendee может быть либо с user (ObjectId или populated), либо с email
         const userEmail = attendee.user?.email || attendee.email;
         const userId = attendee.user?._id || attendee.user;
+        const attendeeId = attendee._id; // ID subdocument для операций (update/delete)
 
         return {
-          id: userId || attendee._id || index,
+          id: attendeeId || index, // Используем attendee._id для операций
+          userId: userId, // Сохраняем userId отдельно для справки
           email: userEmail,
-          role: attendee.role || 'participant',
+          role: attendee.role || attendee.pending_role || 'viewer', // Используем role из backend или pending_role
           status: attendee.status || 'invited',
           avatar: userEmail?.[0]?.toUpperCase() || '?',
         };
@@ -232,7 +234,13 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                         <Select
                           value={attendee.role}
                           onValueChange={async (newRole) => {
+                            if (newRole === attendee.role) {
+                              console.log('⏭️ Role unchanged, skipping update');
+                              return;
+                            }
+
                             const eventId = event?._id || event?.id;
+                            console.log(`🔄 Updating role: eventId=${eventId}, attendeeId=${attendee.id}, newRole=${newRole}`);
                             setLoading(true);
                             try {
                               // Use proper updateAttendeeRole method
@@ -246,7 +254,7 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                               await refetchEvents();
                             } catch (error) {
                               console.error('Error updating role:', error);
-                              toast.error('Failed to update role');
+                              toast.error(error.response?.data?.message || 'Failed to update role');
                             } finally {
                               setLoading(false);
                             }

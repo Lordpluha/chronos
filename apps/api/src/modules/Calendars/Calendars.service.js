@@ -43,10 +43,20 @@ class CalendarsService {
     // НОВАЯ ЛОГИКА: Загружаем календари из user.calendars (включает shared через Access)
     const user = await User.findById(userId).populate({
       path: 'calendars',
-      populate: {
-        path: 'shared_with.user', // Populate users in shared_with array
-        select: 'email login avatar' // Select only needed fields
-      }
+      populate: [
+        {
+          path: 'owner',
+          select: 'email login avatar' // Populate owner with needed fields
+        },
+        {
+          path: 'creator',
+          select: 'email login avatar' // Populate creator with needed fields
+        },
+        {
+          path: 'shared_with.user',
+          select: 'email login avatar' // Populate users in shared_with array
+        }
+      ]
     })
 
     if (!user) {
@@ -54,9 +64,7 @@ class CalendarsService {
     }
 
     return user.calendars || []
-  }
-
-  /**
+  }  /**
    * Получить календарь по ID
    */
   async getCalendarById(calendarId, userId, allowPublicAccess = true) {
@@ -169,9 +177,17 @@ class CalendarsService {
       throw error
     }
 
-    // Проверяем что текущий пользователь - владелец
-    if (calendar.owner.toString() !== userId.toString()) {
-      const error = new Error('Only calendar owner can share')
+    // Проверяем права: владелец ИЛИ admin с правом 'share'
+    const isOwner = calendar.owner.toString() === userId.toString()
+    const hasShareAccess = await Access.findOne({
+      user: userId,
+      controls: 'calendar',
+      entity_id: calendarId,
+      type: 'share'
+    })
+
+    if (!isOwner && !hasShareAccess) {
+      const error = new Error('Access denied: no share permission')
       error.status = 403
       throw error
     }
@@ -192,13 +208,16 @@ class CalendarsService {
     }
 
     // Создаем Access записи на основе permission
-    // read -> read
-    // write -> read, update
+    // viewer -> read
     // admin -> read, update, delete, share
+    // owner -> read, update, delete, share (аналогично admin, но семантически выше)
     const accessTypes = {
+      viewer: ['read'],
+      admin: ['read', 'update', 'delete', 'share'],
+      owner: ['read', 'update', 'delete', 'share'],
+      // Поддержка старых названий для обратной совместимости
       read: ['read'],
       write: ['read', 'update'],
-      admin: ['read', 'update', 'delete', 'share']
     }
 
     const typesToGrant = accessTypes[permission] || ['read']
@@ -257,9 +276,17 @@ class CalendarsService {
       throw error
     }
 
-    // Только владелец может удалять доступ
-    if (calendar.owner.toString() !== userId.toString()) {
-      const error = new Error('Only calendar owner can remove access')
+    // Проверяем права: владелец ИЛИ admin с правом 'delete'
+    const isOwner = calendar.owner.toString() === userId.toString()
+    const hasDeleteAccess = await Access.findOne({
+      user: userId,
+      controls: 'calendar',
+      entity_id: calendarId,
+      type: 'delete'
+    })
+
+    if (!isOwner && !hasDeleteAccess) {
+      const error = new Error('Access denied: no delete permission')
       error.status = 403
       throw error
     }
@@ -269,6 +296,29 @@ class CalendarsService {
       const error = new Error('User not found')
       error.status = 404
       throw error
+    }
+
+    // Нельзя удалить владельца
+    if (targetUser._id.toString() === calendar.owner.toString()) {
+      const error = new Error('Cannot remove calendar owner')
+      error.status = 400
+      throw error
+    }
+
+    // Admin не может удалить другого admin
+    if (!isOwner) {
+      const targetHasDeleteAccess = await Access.findOne({
+        user: targetUser._id,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'delete'
+      })
+
+      if (targetHasDeleteAccess) {
+        const error = new Error('Admin cannot remove another admin')
+        error.status = 403
+        throw error
+      }
     }
 
     // Удаляем ВСЕ Access записи для этого пользователя и календаря
@@ -309,9 +359,17 @@ class CalendarsService {
       throw error
     }
 
-    // Проверяем что текущий пользователь - владелец
-    if (calendar.owner.toString() !== userId.toString()) {
-      const error = new Error('Only calendar owner can update access')
+    // Проверяем права: владелец ИЛИ admin с правом 'delete'
+    const isOwner = calendar.owner.toString() === userId.toString()
+    const hasDeleteAccess = await Access.findOne({
+      user: userId,
+      controls: 'calendar',
+      entity_id: calendarId,
+      type: 'delete'
+    })
+
+    if (!isOwner && !hasDeleteAccess) {
+      const error = new Error('Access denied: no delete permission')
       error.status = 403
       throw error
     }
@@ -322,6 +380,29 @@ class CalendarsService {
       const error = new Error('User not found')
       error.status = 404
       throw error
+    }
+
+    // Нельзя изменять права владельца
+    if (targetUser._id.toString() === calendar.owner.toString()) {
+      const error = new Error('Cannot change calendar owner permissions')
+      error.status = 400
+      throw error
+    }
+
+    // Admin не может изменить права другого admin
+    if (!isOwner) {
+      const targetHasDeleteAccess = await Access.findOne({
+        user: targetUser._id,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'delete'
+      })
+
+      if (targetHasDeleteAccess) {
+        const error = new Error('Admin cannot change another admin\'s permissions')
+        error.status = 403
+        throw error
+      }
     }
 
     // Нельзя изменять права для самого себя
@@ -344,9 +425,12 @@ class CalendarsService {
 
     // Создаем новые Access записи на основе permission
     const accessTypes = {
+      viewer: ['read'],
+      admin: ['read', 'update', 'delete', 'share'],
+      owner: ['read', 'update', 'delete', 'share'],
+      // Поддержка старых названий для обратной совместимости
       read: ['read'],
       write: ['read', 'update'],
-      admin: ['read', 'update', 'delete', 'share']
     }
 
     const typesToGrant = accessTypes[permission] || ['read']
