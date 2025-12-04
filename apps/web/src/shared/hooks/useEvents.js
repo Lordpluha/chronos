@@ -19,6 +19,8 @@ export function useEvents(params = {}) {
     queryKey: eventKeys.list(filters),
     queryFn: () => EventApi.getAll(filters),
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnWindowFocus: true, // Обновляем данные при возврате на вкладку
+    refetchInterval: 1000 * 10, // Обновляем каждые 10 секунд для тестирования
     enabled: enabled !== undefined ? enabled : true, // По умолчанию enabled=true, но можно переопределить
   });
 }

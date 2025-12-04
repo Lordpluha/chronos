@@ -14,6 +14,8 @@ export function useCalendars(options = {}) {
     queryKey: calendarKeys.lists(),
     queryFn: () => CalendarApi.getAll(),
     staleTime: 1000 * 60 * 10, // 10 minutes
+    refetchOnWindowFocus: true, // Обновляем при возврате на вкладку
+    refetchInterval: 1000 * 10, // Обновляем каждые 10 секунд для тестирования
     ...options, // Позволяет передать enabled и другие опции
   });
 }

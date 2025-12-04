@@ -4,18 +4,24 @@ import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
 import { Label } from '@shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/ui/select';
-import { Switch } from '@shared/ui/switch';
-import { Copy, Mail, Link2, Users, Trash2, Check, Loader2 } from 'lucide-react';
+import { Copy, Mail, Link2, Users, Trash2, Check, Loader2, Crown, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { CalendarApi } from '@entities/Calendar/api/CalendarApi';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useAuth } from '@shared/context/AuthContext';
+
+// Permission presets для удобства
+const PERMISSION_PRESETS = {
+  viewer: { label: 'Viewer', description: 'Can only view events', value: 'read' },
+  editor: { label: 'Editor', description: 'Can create and edit events', value: 'write' },
+  admin: { label: 'Admin', description: 'Full control including sharing', value: 'admin' },
+};
 
 export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   const { refetchCalendars, refetchEvents } = useContext(CalendarContext);
+  const { user: currentUser } = useAuth();
   const [email, setEmail] = useState('');
   const [permission, setPermission] = useState('read');
-  const [publicLink, setPublicLink] = useState('');
-  const [isPublic, setIsPublic] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sharedWith, setSharedWith] = useState([]);
@@ -23,13 +29,23 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
   // Load existing shares from calendar object
   useEffect(() => {
     if (calendar?.shared_with) {
-      const shares = calendar.shared_with.map((share, index) => ({
-        id: share._id || index,
-        email: share.user?.email || share.email,
-        permission: share.permission,
-        avatar: (share.user?.email || share.email)?.[0]?.toUpperCase() || '?',
-        userId: share.user?._id || share.user,
-      }));
+      const shares = calendar.shared_with.map((share, index) => {
+        // Handle both populated and non-populated user objects
+        const userObj = share.user;
+        const email = userObj?.email || share.email || 'Unknown User';
+        const name = userObj?.name || email.split('@')[0];
+        const userId = userObj?._id || share.user;
+
+        return {
+          id: share._id || index,
+          email: email,
+          name: name,
+          permission: share.permission || 'read',
+          avatar: email !== 'Unknown User' ? email[0]?.toUpperCase() : '?',
+          userId: userId,
+        };
+      }).filter(share => share.email !== 'Unknown User'); // Фильтруем невалидные записи
+
       setSharedWith(shares);
     }
   }, [calendar]);
@@ -108,24 +124,11 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
 
   const handleCopyLink = () => {
     const calendarId = calendar?._id || calendar?.id;
-    const link = publicLink || `${window.location.origin}/calendar?cal=${calendarId}`;
+    const link = `${window.location.origin}/calendar?cal=${calendarId}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     toast.success('Link copied to clipboard');
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleTogglePublic = (checked) => {
-    setIsPublic(checked);
-    if (checked) {
-      const calendarId = calendar?._id || calendar?.id;
-      // TODO: Generate public link
-      setPublicLink(`${window.location.origin}/calendar?cal=${calendarId}`);
-      toast.success('Public link generated');
-    } else {
-      setPublicLink('');
-      toast.info('Public access disabled');
-    }
   };
 
   return (
@@ -176,81 +179,148 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
             </div>
 
             {/* List of shared users */}
-            {sharedWith.length > 0 && (
-              <div className="space-y-2 mt-4">
-                <Label className="text-xs text-gray-500">People with access</Label>
-                {sharedWith.map((user) => (
-                  <div
-                    key={user.id}
-                    className="flex items-center justify-between p-2 rounded-md border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-linear-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
-                        {user.avatar}
+            <div className="space-y-2 mt-4">
+              <Label className="text-xs text-gray-500">People with access</Label>
+
+              {/* Owner/Creator */}
+              {calendar?.owner && (
+                <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
+                      {calendar.owner?.email?.[0]?.toUpperCase() || 'O'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{calendar.owner?.email || 'Owner'}</p>
+                        <Crown className="h-3.5 w-3.5 text-amber-500" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{user.email}</p>
-                        <p className="text-xs text-gray-500 capitalize">{user.permission} access</p>
+                      <p className="text-xs text-gray-500">Owner • Full control</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shared users */}
+              {sharedWith.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-2 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                      {user.avatar}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{user.name || user.email}</p>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={user.permission}
+                          onValueChange={async (newPermission) => {
+                            const calendarId = calendar?._id || calendar?.id;
+                            setLoading(true);
+                            try {
+                              await CalendarApi.share(calendarId, {
+                                userEmail: user.email,
+                                permission: newPermission,
+                              });
+
+                              setSharedWith(sharedWith.map(u =>
+                                u.id === user.id ? { ...u, permission: newPermission } : u
+                              ));
+
+                              toast.success('Permission updated');
+                              await refetchCalendars();
+                              await refetchEvents();
+                            } catch (error) {
+                              console.error('Error updating permission:', error);
+                              toast.error('Failed to update permission');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="w-[110px] h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="read">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">Viewer</span>
+                                <span className="text-xs text-gray-500">Can only view</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="write">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">Editor</span>
+                                <span className="text-xs text-gray-500">Can edit events</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="admin">
+                              <div className="flex flex-col items-start">
+                                <span className="font-medium">Admin</span>
+                                <span className="text-xs text-gray-500">Full control</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleRemoveShare(user)}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    onClick={() => handleRemoveShare(user)}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              ))}
+
+              {sharedWith.length === 0 && !calendar?.owner && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No one has access yet. Share to collaborate!
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* Public link */}
+          {/* Copy calendar link */}
           <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Public link</Label>
-                <p className="text-xs text-gray-500">Anyone with the link can view</p>
-              </div>
-              <Switch
-                checked={isPublic}
-                onCheckedChange={handleTogglePublic}
+            <Label className="text-sm font-medium">Calendar link</Label>
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={`${window.location.origin}/calendar?cal=${calendar?._id || calendar?.id || 'xxx'}`}
+                className="font-mono text-sm"
               />
+              <Button
+                variant="outline"
+                onClick={handleCopyLink}
+                className="gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    Copy
+                  </>
+                )}
+              </Button>
             </div>
-
-            {isPublic && (
-              <div className="flex gap-2">
-                <Input
-                  readOnly
-                  value={publicLink}
-                  className="font-mono text-sm"
-                />
-                <Button
-                  variant="outline"
-                  onClick={handleCopyLink}
-                  className="gap-2"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
+            <p className="text-xs text-gray-500">
+              Share this link with anyone to let them view calendar and events
+            </p>
           </div>
         </div>
 

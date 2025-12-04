@@ -16,6 +16,7 @@ export interface IAttendee {
   status: 'invited' | 'accepted' | 'declined' | 'maybe'
   invited_at: Date
   responded_at?: Date
+  pending_role?: 'owner' | 'admin' | 'viewer' // Role до подтверждения
 }
 
 export interface IRecurrence {
@@ -53,7 +54,7 @@ export interface IEventMethods {
   isActive(): boolean
   isUpcoming(): boolean
   isPast(): boolean
-  addAttendee(userIdOrEmail: Types.ObjectId | string, isUser?: boolean): void
+  addAttendee(userIdOrEmail: Types.ObjectId | string, isUser?: boolean, role?: string): void
   updateAttendeeStatus(userIdOrEmail: Types.ObjectId | string, status: 'invited' | 'accepted' | 'declined' | 'maybe', isUser?: boolean): void
   removeAttendee(userIdOrEmail: Types.ObjectId | string, isUser?: boolean): void
   generateOccurrences(rangeStart: Date, rangeEnd: Date, maxOccurrences?: number): Date[]

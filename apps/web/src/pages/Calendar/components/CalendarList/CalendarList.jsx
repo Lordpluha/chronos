@@ -115,7 +115,7 @@ export const CalendarList = () => {
       {/* My Calendars Section */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Мои календари</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200">My calendars</h3>
           <Button
             variant="ghost"
             size="sm"

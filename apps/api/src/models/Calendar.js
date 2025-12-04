@@ -186,6 +186,10 @@ const calendarSchema = new mongoose.Schema(
           return shareUserId !== userIdStr
         })
       },
+      updateSharedPermission(userId, permission) {
+        // Алиас для shareWith - для ясности кода
+        return this.shareWith(userId, permission)
+      },
       addEvent(eventId) {
         const id = /** @type {import('mongoose').Types.ObjectId} */ (eventId)
         if (!this.events.includes(id)) {

@@ -156,6 +156,7 @@ class AppConfigClass {
       this.#emailTransporter = nodemailer.createTransport({
         host: this.SMTP_HOST,
         port: this.SMTP_PORT,
+        secure: false, // false for port 2525, true for 465
         auth: {
           user: this.SMTP_USER,
           pass: this.SMTP_PASS,

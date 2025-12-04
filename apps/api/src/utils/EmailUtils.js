@@ -61,12 +61,12 @@ export class EmailUtilsClass {
     `
   }
 
-  generateEventInviteEmail(organizerName, eventTitle, eventStart, eventEnd, role) {
+  generateEventInviteEmail(organizerName, eventTitle, eventStart, eventEnd, role, eventId) {
     const roleText = {
-      organizer: 'Organizer',
-      participant: 'Participant',
+      owner: 'Owner',
+      admin: 'Admin',
       viewer: 'Viewer'
-    }[role] || 'Participant';
+    }[role] || 'Viewer';
 
     const startDate = new Date(eventStart).toLocaleString('en-US', {
       weekday: 'long',
@@ -94,11 +94,11 @@ export class EmailUtilsClass {
         </div>
 
         <div style="text-align:center;margin:24px 0;">
-          <a href="http://localhost:5173/calendar"
+          <a href="http://localhost:5173/calendar?event=${eventId}&action=accept"
              style="display:inline-block;padding:12px 32px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;margin-right:8px;">
             ✓ Accept
           </a>
-          <a href="http://localhost:5173/calendar"
+          <a href="http://localhost:5173/calendar?event=${eventId}"
              style="display:inline-block;padding:12px 32px;background:#6b7280;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
             View Details
           </a>

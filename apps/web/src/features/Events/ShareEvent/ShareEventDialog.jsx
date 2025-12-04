@@ -4,13 +4,15 @@ import { Button } from '@shared/ui/button';
 import { Input } from '@shared/ui/input';
 import { Label } from '@shared/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared/ui/select';
-import { Copy, Mail, UserPlus, Trash2, Check, Loader2 } from 'lucide-react';
+import { Copy, Mail, UserPlus, Trash2, Check, Loader2, Crown, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { EventApi } from '@entities/Event/api/EventApi';
 import { CalendarContext } from '@shared/context/CalendarContext';
+import { useAuth } from '@shared/context/AuthContext';
 
 export function ShareEventDialog({ open, onOpenChange, event }) {
   const { refetchCalendars, refetchEvents } = useContext(CalendarContext);
+  const { user: currentUser } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
   const [copied, setCopied] = useState(false);
@@ -55,10 +57,13 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
 
     setLoading(true);
     try {
-      await EventApi.addAttendee(eventId, {
+      console.log(`📧 Inviting ${email} with role ${role} to event ${eventId}`);
+      const response = await EventApi.addAttendee(eventId, {
         email,
         role,
       });
+
+      console.log('✅ Server response:', response);
 
       const newAttendee = {
         id: Date.now(),
@@ -74,10 +79,10 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
 
       // Refetch data so target user sees the calendar and event
       console.log('🔄 Attendee added, refetching data...');
-      await refetchCalendars();
-      await refetchEvents();
+      await Promise.all([refetchCalendars(), refetchEvents()]);
+      console.log('✅ Data refetched successfully');
     } catch (error) {
-      console.error('Error inviting attendee:', error);
+      console.error('❌ Error inviting attendee:', error);
       toast.error(error.response?.data?.message || 'Failed to invite attendee');
     } finally {
       setLoading(false);
@@ -131,8 +136,8 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
 
   const getRoleBadge = (role) => {
     switch (role) {
-      case 'organizer': return 'Organizer';
-      case 'participant': return 'Participant';
+      case 'owner': return 'Owner';
+      case 'admin': return 'Admin';
       case 'viewer': return 'Viewer';
       default: return role;
     }
@@ -170,9 +175,9 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="participant">Participant</SelectItem>
                   <SelectItem value="viewer">Viewer</SelectItem>
-                  <SelectItem value="organizer">Organizer</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="owner">Owner</SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleInvite} disabled={loading}>
@@ -186,51 +191,113 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
             </div>
 
             {/* List of attendees */}
-            {attendees.length > 0 && (
-              <div className="space-y-2 mt-4">
-                <Label className="text-xs text-gray-500">
-                  Attendees ({attendees.length})
-                </Label>
-                {attendees.map((attendee) => (
-                  <div
-                    key={attendee.id}
-                    className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
-                        {attendee.avatar}
+            <div className="space-y-2 mt-4">
+              <Label className="text-xs text-gray-500">
+                Attendees ({attendees.length + (event?.creator ? 1 : 0)})
+              </Label>
+
+              {/* Event Creator */}
+              {event?.creator && (
+                <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
+                      {event.creator?.email?.[0]?.toUpperCase() || 'C'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium">{event.creator?.email || 'Creator'}</p>
+                        <Crown className="h-3.5 w-3.5 text-amber-500" />
                       </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{attendee.email}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                            {getRoleBadge(attendee.role)}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(attendee.status)}`}>
-                            {attendee.status}
-                          </span>
-                        </div>
+                      <span className="text-xs text-gray-500">
+                        Creator • Organizer
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Other attendees */}
+              {attendees.map((attendee) => (
+                <div
+                  key={attendee.id}
+                  className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
+                      {attendee.avatar}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{attendee.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Select
+                          value={attendee.role}
+                          onValueChange={async (newRole) => {
+                            const eventId = event?._id || event?.id;
+                            setLoading(true);
+                            try {
+                              // Use proper updateAttendeeRole method
+                              await EventApi.updateAttendeeRole(eventId, attendee.id, newRole);
+
+                              setAttendees(attendees.map(a =>
+                                a.id === attendee.id ? { ...a, role: newRole } : a
+                              ));
+
+                              toast.success('Role updated');
+                              await refetchEvents();
+                            } catch (error) {
+                              console.error('Error updating role:', error);
+                              toast.error('Failed to update role');
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          disabled={loading || attendee.role === 'organizer'}
+                        >
+                          <SelectTrigger className="w-[100px] h-6 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="viewer">
+                              <span className="text-xs">Viewer</span>
+                            </SelectItem>
+                            <SelectItem value="admin">
+                              <span className="text-xs">Admin</span>
+                            </SelectItem>
+                            <SelectItem value="owner">
+                              <span className="text-xs">Owner</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(attendee.status)}`}>
+                          {attendee.status}
+                        </span>
                       </div>
                     </div>
-                    {attendee.role !== 'organizer' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleRemoveAttendee(attendee)}
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                  {attendee.role !== 'organizer' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                      onClick={() => handleRemoveAttendee(attendee)}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              {attendees.length === 0 && !event?.creator && (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  No attendees yet. Invite people to collaborate!
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Copy event link */}

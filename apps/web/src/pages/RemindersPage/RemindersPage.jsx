@@ -30,9 +30,7 @@ export const RemindersPage = () => {
     const fetchCalendars = async () => {
       try {
         const response = await CalendarApi.getAll();
-        console.log('📅 Loaded calendars:', response);
         const validCalendars = response.filter(cal => cal && cal._id && cal.title);
-        console.log('✅ Valid calendars:', validCalendars);
         setCalendars(validCalendars);
       } catch (err) {
         console.error('Failed to load calendars:', err);

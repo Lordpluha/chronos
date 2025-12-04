@@ -49,6 +49,12 @@ class EventApiClass {
     return response.data;
   }
 
+  // Update attendee role (organizer only)
+  async updateAttendeeRole(eventId, attendeeId, role) {
+    const response = await api.patch(`/events/${eventId}/attendees/${attendeeId}/role`, { role });
+    return response.data;
+  }
+
   // Remove attendee from event
   async removeAttendee(eventId, attendeeId) {
     const response = await api.delete(`/events/${eventId}/attendees/${attendeeId}`);

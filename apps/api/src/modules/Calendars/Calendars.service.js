@@ -40,18 +40,31 @@ class CalendarsService {
    * Получить все календари пользователя
    */
   async getUserCalendars(userId) {
-    const calendars = await Calendar.findAccessibleByUser(userId)
-    return calendars
+    // НОВАЯ ЛОГИКА: Загружаем календари из user.calendars (включает shared через Access)
+    const user = await User.findById(userId).populate({
+      path: 'calendars',
+      populate: {
+        path: 'shared_with.user', // Populate users in shared_with array
+        select: 'email login avatar' // Select only needed fields
+      }
+    })
+
+    if (!user) {
+      return []
+    }
+
+    return user.calendars || []
   }
 
   /**
    * Получить календарь по ID
    */
-  async getCalendarById(calendarId, userId) {
+  async getCalendarById(calendarId, userId, allowPublicAccess = true) {
     const calendar = await Calendar.findById(calendarId)
       .populate('owner creator')
       .populate('reminders')
       .populate('events')
+      .populate('shared_with.user') // Populate users in shared_with array
 
     if (!calendar) {
       const error = new Error('Calendar not found')
@@ -60,11 +73,18 @@ class CalendarsService {
     }
 
     // Проверяем доступ
-    if (!calendar.hasAccess(userId)) {
+    if (!allowPublicAccess && !calendar.hasAccess(userId)) {
       const error = new Error('Access denied')
       error.status = 403
       throw error
     }
+
+    // Логируем доступ для отладки
+    console.log(`📋 Calendar access check: ${calendar.title} (${calendarId})`, {
+      userId,
+      allowPublicAccess,
+      hasAccess: calendar.hasAccess(userId)
+    });
 
     return calendar
   }
@@ -273,6 +293,157 @@ class CalendarsService {
     console.log(`✅ All access records removed for ${targetUser.email} on calendar ${calendar.title}`)
 
     return calendar
+  }
+
+  /**
+   * Обновить права доступа к календарю (через Access модель)
+   */
+  async updateCalendarAccess(calendarId, userId, updateData) {
+    const { userEmail, permission } = updateData
+
+    const calendar = await Calendar.findById(calendarId)
+
+    if (!calendar) {
+      const error = new Error('Calendar not found')
+      error.status = 404
+      throw error
+    }
+
+    // Проверяем что текущий пользователь - владелец
+    if (calendar.owner.toString() !== userId.toString()) {
+      const error = new Error('Only calendar owner can update access')
+      error.status = 403
+      throw error
+    }
+
+    // Находим пользователя по email
+    const targetUser = await User.findByEmail(userEmail)
+    if (!targetUser) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    // Нельзя изменять права для самого себя
+    if (targetUser._id.toString() === userId.toString()) {
+      const error = new Error('Cannot update your own permissions')
+      error.status = 400
+      throw error
+    }
+
+    // Сначала удаляем все текущие права
+    const allAccessTypes = ['read', 'update', 'delete', 'share']
+    for (const type of allAccessTypes) {
+      await Access.revokeAccess(
+        targetUser._id,
+        'calendar',
+        type,
+        calendar._id
+      )
+    }
+
+    // Создаем новые Access записи на основе permission
+    const accessTypes = {
+      read: ['read'],
+      write: ['read', 'update'],
+      admin: ['read', 'update', 'delete', 'share']
+    }
+
+    const typesToGrant = accessTypes[permission] || ['read']
+
+    // Создаем Access записи для каждого типа
+    for (const type of typesToGrant) {
+      const accessName = `calendar.${type}.${new mongoose.Types.ObjectId().toString()}`
+      await Access.grantAccess(
+        targetUser._id,
+        'calendar',
+        type,
+        calendar._id,
+        accessName
+      )
+    }
+
+    // Также обновляем в shared_with для обратной совместимости
+    calendar.updateSharedPermission(targetUser._id, permission)
+    await calendar.save()
+
+    console.log(`✅ Access updated for ${targetUser.email}: ${typesToGrant.join(', ')}`)
+
+    return calendar
+  }
+
+  /**
+   * Подписаться на календарь через публичную ссылку (self-subscription)
+   * Если userEmail не указан - используется текущий userId
+   */
+  async subscribeToCalendar(calendarId, currentUserId, subscriptionData = {}) {
+    const { userEmail, permission = 'read' } = subscriptionData
+
+    console.log('🔗 Calendar subscription request:', { calendarId, currentUserId, userEmail, permission });
+
+    const calendar = await Calendar.findById(calendarId)
+
+    if (!calendar) {
+      const error = new Error('Calendar not found')
+      error.status = 404
+      throw error
+    }
+
+    // Определяем целевого пользователя
+    let targetUser;
+    if (userEmail) {
+      // Если указан email - ищем по нему
+      targetUser = await User.findByEmail(userEmail)
+      if (!targetUser) {
+        const error = new Error('User not found')
+        error.status = 404
+        throw error
+      }
+    } else {
+      // Если email не указан - используем текущего пользователя (самоподписка)
+      targetUser = await User.findById(currentUserId)
+      if (!targetUser) {
+        const error = new Error('Current user not found')
+        error.status = 404
+        throw error
+      }
+      console.log('👤 Self-subscription for user:', targetUser.email);
+    }
+
+    // Проверяем не является ли пользователь уже владельцем
+    if (calendar.owner.toString() === targetUser._id.toString()) {
+      console.log('⚠️ User is already the owner of this calendar');
+      return calendar; // Владелец уже имеет полный доступ
+    }
+
+    // Проверяем нет ли уже доступа
+    const existingAccess = await Access.hasAccess(targetUser._id, 'calendar', 'read', calendar._id);
+    if (existingAccess) {
+      console.log('✅ User already has access to this calendar');
+      return calendar;
+    }
+
+    // Создаем Access записи (только для чтения при самоподписке)
+    const accessName = `calendar.read.${new mongoose.Types.ObjectId().toString()}`;
+    await Access.grantAccess(
+      targetUser._id,
+      'calendar',
+      'read',
+      calendar._id,
+      accessName
+    );
+
+    // Добавляем в shared_with для обратной совместимости
+    calendar.shareWith(targetUser._id, permission);
+    await calendar.save();
+
+    // Добавляем календарь в список пользователя
+    targetUser.addCalendar(calendar._id);
+    await targetUser.save();
+
+    console.log(`✅ User ${targetUser.email} subscribed to calendar "${calendar.title}"`);
+
+    return calendar;
   }
 }
 

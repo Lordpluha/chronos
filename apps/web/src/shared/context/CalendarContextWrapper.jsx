@@ -8,7 +8,7 @@ import { useReminders, useReminderNotifications } from "@features/Reminders";
 import { useTasksWithDates } from "@features/Tasks/hooks";
 
 export const CalendarContextWrapper = (props) => {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [monthIndex, setMonthIndex] = useState(dayjs().month());
   const [smallCalendarMonth, setSmallCalendarMonth] = useState(null);
   const [daySelected, setDaySelected] = useState(dayjs());
@@ -101,6 +101,11 @@ export const CalendarContextWrapper = (props) => {
         cal.id === (event.calendar?._id || event.calendar)
       );
 
+      // Если календарь не найден (shared event без доступа к календарю),
+      // используем данные из populated calendar
+      const calendarColor = calendar?.color || event.calendar?.color || '#3b82f6';
+      const calendarId = event.calendar?._id || event.calendar;
+
       return {
         id: event._id || event.id,
         _id: event._id || event.id, // Добавляем _id для API интеграций
@@ -109,13 +114,12 @@ export const CalendarContextWrapper = (props) => {
         day: new Date(event.start).getTime(),
         startTime: dayjs(event.start).format('HH:mm'),
         endTime: dayjs(event.end).format('HH:mm'),
-        calendarId: event.calendar?._id || event.calendar,
-        color: calendar?.color || '#3b82f6', // Use calendar color
+        calendarId: calendarId,
+        color: calendarColor, // Use calendar color or default
         attendees: event.attendees || [], // Добавляем attendees для ShareEventDialog
       };
     });
 
-    console.log('📊 savedEvents transformed:', transformed.length, 'events');
     return transformed;
   }, [eventsData, calendars]);
 
@@ -208,22 +212,12 @@ export const CalendarContextWrapper = (props) => {
         break;
       }
       case "update": {
-        console.log('📤 CalendarContext update payload:', payload);
         const dayDate = dayjs(payload.day);
         const [startHours, startMinutes] = (payload.startTime || '09:00').split(':');
         const [endHours, endMinutes] = (payload.endTime || '10:00').split(':');
 
         const start = dayDate.hour(parseInt(startHours)).minute(parseInt(startMinutes)).second(0).toDate();
         const end = dayDate.hour(parseInt(endHours)).minute(parseInt(endMinutes)).second(0).toDate();
-
-        console.log('📤 Sending to API:', {
-          id: payload.id,
-          title: payload.title,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          startTime: payload.startTime,
-          endTime: payload.endTime,
-        });
 
         updateEventMutation.mutate({
           id: payload.id,
@@ -232,6 +226,7 @@ export const CalendarContextWrapper = (props) => {
             description: payload.description || '',
             start: start.toISOString(),
             end: end.toISOString(),
+            calendar_id: payload.calendarId,
           },
         });
         break;
@@ -244,12 +239,37 @@ export const CalendarContextWrapper = (props) => {
     }
   };
 
-  // Filter events by visible calendars
+  // Filter events by visible calendars OR if user is an attendee
   const filteredEvents = useMemo(() => {
-    return allEvents.filter((evt) =>
-      visibleCalendarIds.includes(evt.calendarId) || evt.calendarId === 'tasks'
-    );
-  }, [allEvents, visibleCalendarIds]);
+    const currentUserId = user?._id || user?.id;
+
+    return allEvents.filter((evt) => {
+      // Always show tasks
+      if (evt.calendarId === 'tasks') {
+        return true;
+      }
+
+      // Show if calendar is visible
+      if (visibleCalendarIds.includes(evt.calendarId)) {
+        return true;
+      }
+
+      // Show if user is an attendee (shared event without calendar access)
+      if (currentUserId && evt.attendees && Array.isArray(evt.attendees)) {
+        const isAttendee = evt.attendees.some(attendee => {
+          // attendee может быть объектом с user или просто email
+          const attendeeUserId = attendee.user?._id || attendee.user;
+          return attendeeUserId && attendeeUserId.toString() === currentUserId.toString();
+        });
+
+        if (isAttendee) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }, [allEvents, visibleCalendarIds, user]);
 
   // Toggle calendar visibility
   const toggleCalendarVisibility = (calendarId) => {

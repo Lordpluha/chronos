@@ -126,6 +126,10 @@ const eventSchema = new mongoose.Schema(
         responded_at: {
           type: Date,
         },
+        pending_role: {
+          type: String,
+          enum: ['owner', 'admin', 'viewer'],
+        },
       },
     ],
     label: {
@@ -346,8 +350,9 @@ const eventSchema = new mongoose.Schema(
       /**
        * @param {import('mongoose').Types.ObjectId | string} userIdOrEmail
        * @param {boolean} [isUser=true]
+       * @param {string} [role='participant'] - Role не сохраняется в attendees (управляется через Access)
        */
-      addAttendee(userIdOrEmail, isUser = true) {
+      addAttendee(userIdOrEmail, isUser = true, role = 'participant') {
         const existingIndex = this.attendees.findIndex((attendee) => {
           if (isUser && attendee.user) {
             const attendeeUser = attendee.user
@@ -364,9 +369,9 @@ const eventSchema = new mongoose.Schema(
           let attendeeData
 
           if (isUser) {
-            attendeeData = { user: userIdOrEmail, status: 'invited', invited_at: new Date() }
+            attendeeData = { user: userIdOrEmail, status: 'invited', invited_at: new Date(), pending_role: role }
           } else {
-            attendeeData = { email: /** @type {string} */ (userIdOrEmail), status: 'invited', invited_at: new Date() }
+            attendeeData = { email: /** @type {string} */ (userIdOrEmail), status: 'invited', invited_at: new Date(), pending_role: role }
           }
 
           this.attendees.push(attendeeData)

@@ -118,6 +118,9 @@ class EventsService {
   async getUserEvents(userId, query = {}) {
     const { startDate, endDate, status } = query
 
+    // Преобразуем userId в ObjectId для правильного сравнения
+    const userObjectId = new mongoose.Types.ObjectId(userId)
+
     // Получаем все календари пользователя (включая shared)
     const user = await User.findById(userId).populate('calendars')
     if (!user) {
@@ -128,34 +131,71 @@ class EventsService {
 
     const calendarIds = user.calendars.map(cal => cal._id)
 
-    let events = []
+    let eventsFromCalendars = []
+    let eventsAsAttendee = []
 
-    // Загружаем события из всех календарей пользователя
+    // 1. Загружаем события из календарей пользователя
     if (calendarIds.length > 0) {
-      const query = { calendar: { $in: calendarIds } }
+      const queryObj = { calendar: { $in: calendarIds } }
 
       if (startDate && endDate) {
-        query.start = { $gte: new Date(startDate), $lte: new Date(endDate) }
+        queryObj.start = { $gte: new Date(startDate), $lte: new Date(endDate) }
       }
 
-      events = await Event.find(query)
+      eventsFromCalendars = await Event.find(queryObj)
         .populate('creator organizer calendar')
         .populate('attendees.user')
         .sort({ start: 1 })
     }
 
-    if (status) {
-      events = events.filter((event) => event.status === status)
+    // 2. Загружаем события где пользователь - attendee С ПРИНЯТЫМ ПРИГЛАШЕНИЕМ (но календарь НЕ в user.calendars)
+    const attendeeQuery = {
+      attendees: {
+        $elemMatch: {
+          user: userObjectId,
+          status: 'accepted' // Только принятые приглашения!
+        }
+      }
     }
 
-    console.log(`📊 Loaded ${events.length} events for user from ${calendarIds.length} calendars`)
+    // Исключаем календари которые уже в user.calendars (чтобы не было дубликатов)
+    if (calendarIds.length > 0) {
+      attendeeQuery.calendar = { $nin: calendarIds }
+    }
+
+    if (startDate && endDate) {
+      attendeeQuery.start = { $gte: new Date(startDate), $lte: new Date(endDate) }
+    }
+
+    eventsAsAttendee = await Event.find(attendeeQuery)
+      .populate('creator organizer calendar')
+      .populate('attendees.user')
+      .sort({ start: 1 })
+
+    // Объединяем оба списка
+    let events = [...eventsFromCalendars, ...eventsAsAttendee]
+
+    // Удаляем дубликаты по _id
+    const uniqueEvents = Array.from(
+      new Map(events.map(e => [e._id.toString(), e])).values()
+    )
+
+    if (status) {
+      events = uniqueEvents.filter((event) => event.status === status)
+    } else {
+      events = uniqueEvents
+    }
+
     return events
   }
 
   /**
    * Получить событие по ID
+   * @param {string} eventId - ID события
+   * @param {string} userId - ID пользователя
+   * @param {boolean} allowPublicAccess - Разрешить публичный просмотр по ссылке
    */
-  async getEventById(eventId, userId) {
+  async getEventById(eventId, userId, allowPublicAccess = true) {
     const event = await Event.findById(eventId).populate('creator organizer calendar attendees.user')
 
     if (!event) {
@@ -164,19 +204,113 @@ class EventsService {
       throw error
     }
 
-    // Проверяем доступ через календарь
-    if (event.calendar && typeof event.calendar !== 'string') {
-      if (!event.calendar.hasAccess(userId)) {
-        const error = new Error('Access denied')
-        error.status = 403
-        throw error
-      }
+    // НОВОЕ: Разрешаем публичный доступ по прямой ссылке (read-only)
+    // Это позволяет любому пользователю с ссылкой просматривать событие
+    if (allowPublicAccess) {
+      console.log(`🌍 Public link access for event "${event.title}"`)
+      return event
     }
 
-    return event
-  }
+    // Проверяем доступ:
+    // 1. Через календарь (если у пользователя есть доступ к календарю)
+    // 2. Или если пользователь - attendee события
+    // 3. Или если пользователь - создатель/организатор
 
-  /**
+    const userObjectId = new mongoose.Types.ObjectId(userId)
+
+    // Проверяем, является ли пользователь создателем или организатором
+    const isCreatorOrOrganizer =
+      event.creator.toString() === userId ||
+      event.organizer.toString() === userId
+
+    // Проверяем, является ли пользователь attendee С ПРИНЯТЫМ ПРИГЛАШЕНИЕМ
+    const isAttendee = event.attendees.some(attendee => {
+      if (attendee.user) {
+        const attendeeUserId = attendee.user._id || attendee.user
+        const isUserMatch = attendeeUserId.toString() === userId
+        // Доступ только если приглашение принято (accepted)
+        return isUserMatch && attendee.status === 'accepted'
+      }
+      return false
+    })
+
+    // Проверяем доступ через календарь
+    let hasCalendarAccess = false
+    if (event.calendar && typeof event.calendar !== 'string') {
+      hasCalendarAccess = event.calendar.hasAccess(userId)
+    }
+
+    console.log(`🔐 Access check for event "${event.title}" (${eventId}):`)
+    console.log(`   User: ${userId}`)
+    console.log(`   Creator: ${event.creator}`)
+    console.log(`   Organizer: ${event.organizer}`)
+    console.log(`   isCreatorOrOrganizer: ${isCreatorOrOrganizer}`)
+    console.log(`   isAttendee: ${isAttendee}`)
+    console.log(`   hasCalendarAccess: ${hasCalendarAccess}`)
+    console.log(`   Attendees count: ${event.attendees.length}`)
+
+    if (!isCreatorOrOrganizer && !isAttendee && !hasCalendarAccess) {
+      console.log(`❌ Access denied!`)
+      const error = new Error('Access denied')
+      error.status = 403
+      throw error
+    }
+
+    console.log(`✅ Access granted!`)
+
+    // Добавляем роли к каждому attendee из Access записей
+    const eventObj = event.toObject()
+    if (eventObj.attendees && eventObj.attendees.length > 0) {
+      const attendeesWithRoles = await Promise.all(
+        eventObj.attendees.map(async (attendee) => {
+          // Если attendee без user (только email), то viewer (по умолчанию)
+          if (!attendee.user) {
+            return { ...attendee, role: 'viewer' }
+          }
+
+          // Получаем ID пользователя
+          const attendeeUserId = typeof attendee.user === 'object' && attendee.user._id
+            ? attendee.user._id.toString()
+            : attendee.user.toString()
+
+          // Организатор всегда имеет роль owner
+          if (attendeeUserId === event.organizer.toString()) {
+            return { ...attendee, role: 'owner' }
+          }
+
+          // Получаем Access записи для этого пользователя и события
+          const accesses = await Access.find({
+            user: attendeeUserId,
+            controls: 'event',
+            entity_id: eventId
+          })
+
+          // Если нет Access записей, но есть pending_role - используем его (приглашение не принято)
+          if (accesses.length === 0 && attendee.pending_role) {
+            return { ...attendee, role: attendee.pending_role }
+          }
+
+          // Определяем роль на основе прав доступа
+          const permissions = accesses.map(a => a.type)
+          let role = 'viewer' // default
+
+          if (permissions.includes('share') && permissions.includes('delete')) {
+            role = 'owner'
+          } else if (permissions.includes('share') && permissions.includes('update')) {
+            role = 'admin'
+          } else if (permissions.includes('read') && !permissions.includes('update')) {
+            role = 'viewer'
+          }
+
+          return { ...attendee, role }
+        })
+      )
+
+      eventObj.attendees = attendeesWithRoles
+    }
+
+    return eventObj
+  }  /**
    * Обновить событие
    */
   async updateEvent(eventId, userId, data) {
@@ -189,13 +323,34 @@ class EventsService {
     }
 
     // Проверяем права на редактирование
+    // 1. Проверяем через Access записи для события
+    const eventAccess = await Access.findOne({
+      user: userId,
+      controls: 'event',
+      entity_id: eventId,
+      type: 'update'
+    })
+
+    // 2. Проверяем через календарь (если нет прямых прав на событие)
+    let hasCalendarWriteAccess = false
     if (event.calendar && typeof event.calendar !== 'string') {
-      if (!event.calendar.hasAccess(userId, 'write')) {
-        const error = new Error('Access denied')
-        error.status = 403
-        throw error
-      }
+      hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
     }
+
+    // 3. Проверяем, является ли пользователь организатором
+    const isOrganizer = event.organizer.toString() === userId
+
+    if (!eventAccess && !hasCalendarWriteAccess && !isOrganizer) {
+      console.log(`❌ Access denied for user ${userId} to update event ${eventId}`)
+      console.log(`   eventAccess: ${!!eventAccess}`)
+      console.log(`   hasCalendarWriteAccess: ${hasCalendarWriteAccess}`)
+      console.log(`   isOrganizer: ${isOrganizer}`)
+      const error = new Error('Access denied')
+      error.status = 403
+      throw error
+    }
+
+    console.log(`✅ Update access granted for user ${userId}`)
 
     // Обновляем поля
     if (data.title !== undefined) event.title = data.title
@@ -211,11 +366,42 @@ class EventsService {
       event.is_recurring = !!data.recurrence
     }
 
+    // Перемещение события в другой календарь
+    const currentCalendarId = event.calendar?._id ? event.calendar._id.toString() : event.calendar.toString();
+
+    if (data.calendar_id !== undefined && data.calendar_id !== currentCalendarId) {
+      // Проверяем доступ к новому календарю
+      const newCalendar = await Calendar.findById(data.calendar_id);
+      if (!newCalendar) {
+        const error = new Error('Target calendar not found');
+        error.status = 404;
+        throw error;
+      }
+
+      if (!newCalendar.hasAccess(userId, 'write')) {
+        const error = new Error('No write access to target calendar');
+        error.status = 403;
+        throw error;
+      }
+
+      // Удаляем событие из старого календаря
+      const oldCalendar = await Calendar.findById(currentCalendarId);
+      if (oldCalendar) {
+        oldCalendar.removeEvent(eventId);
+        await oldCalendar.save();
+      }
+
+      // Добавляем событие в новый календарь
+      newCalendar.addEvent(eventId);
+      await newCalendar.save();
+
+      // Обновляем ссылку на календарь в событии
+      event.calendar = data.calendar_id;
+    }
+
     await event.save()
     return event
-  }
-
-  /**
+  }  /**
    * Удалить рекуррентное событие
    * @param {string} eventId - ID события
    * @param {string} userId - ID пользователя
@@ -284,20 +470,45 @@ class EventsService {
       throw error
     }
 
-    // Проверяем права (организатор или доступ к календарю)
+    // Проверяем права на удаление
+    // 1. Проверяем через Access записи для события
+    const eventAccess = await Access.findOne({
+      user: userId,
+      controls: 'event',
+      entity_id: eventId,
+      type: 'delete'
+    })
+
+    // 2. Проверяем через календарь (если нет прямых прав на событие)
+    let hasCalendarWriteAccess = false
     if (event.calendar && typeof event.calendar !== 'string') {
-      if (!event.calendar.hasAccess(userId, 'write') && event.organizer.toString() !== userId) {
-        const error = new Error('Access denied')
-        error.status = 403
-        throw error
-      }
+      hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
     }
+
+    // 3. Проверяем, является ли пользователь организатором
+    const isOrganizer = event.organizer.toString() === userId
+
+    if (!eventAccess && !hasCalendarWriteAccess && !isOrganizer) {
+      console.log(`❌ Access denied for user ${userId} to delete event ${eventId}`)
+      const error = new Error('Access denied')
+      error.status = 403
+      throw error
+    }
+
+    console.log(`✅ Delete access granted for user ${userId}`)
 
     // Удаляем событие из календаря
     if (event.calendar && typeof event.calendar !== 'string') {
       event.calendar.removeEvent(event._id)
       await event.calendar.save()
     }
+
+    // Удаляем все Access записи для этого события
+    await Access.deleteMany({
+      controls: 'event',
+      entity_id: eventId
+    })
+    console.log(`🗑️ Removed all access records for event ${eventId}`)
 
     await event.deleteOne()
     return { message: 'Event deleted successfully' }
@@ -307,7 +518,7 @@ class EventsService {
    * Добавить участника к событию (через Access модель)
    */
   async addAttendee(eventId, userId, attendeeData) {
-    const event = await Event.findById(eventId).populate('calendar')
+    const event = await Event.findById(eventId).populate('calendar').populate('attendees.user')
 
     if (!event) {
       const error = new Error('Event not found')
@@ -315,32 +526,48 @@ class EventsService {
       throw error
     }
 
-    if (!event.hasAccess(userId)) {
-      const error = new Error('Access denied')
-      error.status = 403
-      throw error
-    }
-
+    // НОВОЕ: Разрешаем добавлять себя по публичной ссылке
+    // Если не указан email и user_id, добавляем текущего пользователя
     const { user_id, email, role } = attendeeData
-    // NOTE: role используется для определения прав доступа через Access модель
+
+    console.log(`🔍 addAttendee called with: user_id=${user_id}, email=${email}, role=${role}`)
 
     let targetUserId = user_id
     let targetEmail = email
 
+    // Если ничего не передано - добавляем текущего пользователя (self-subscribe)
+    if (!user_id && !email) {
+      targetUserId = userId
+      const currentUser = await User.findById(userId)
+      if (currentUser) {
+        targetEmail = currentUser.email
+      }
+    } else {
+      // Проверяем права доступа только если добавляем другого пользователя
+      if (!event.hasAccess(userId)) {
+        const error = new Error('Access denied')
+        error.status = 403
+        throw error
+      }
+    }
+
+    // NOTE: role используется для определения прав доступа через Access модель
+
     // Если передан email, пытаемся найти пользователя
     if (email && !user_id) {
+      console.log(`🔍 Searching for user by email: ${email}`)
       const targetUser = await User.findByEmail(email)
       if (targetUser) {
+        console.log(`✅ User found by email: ${targetUser.login} (${targetUser._id})`)
         targetUserId = targetUser._id
         targetEmail = targetUser.email
       } else {
-        // Пользователь не найден, но можем добавить по email
-        console.log(`⚠️ User not found for email: ${email}, adding as external attendee`)
+        console.log(`⚠️ User not found by email: ${email}`)
       }
     }
 
     // Если есть userId, получаем email
-    if (user_id && !email) {
+    if (user_id && !email && user_id !== userId) {
       const targetUser = await User.findById(user_id)
       if (targetUser) {
         targetEmail = targetUser.email
@@ -358,59 +585,46 @@ class EventsService {
     }
 
     // Определяем права доступа на основе роли
-    // organizer -> read, update, delete, share
-    // participant -> read, update (может обновить свой статус)
-    // viewer -> read
+    // owner -> read, update, delete, share (создатель события)
+    // admin -> read, update, share (может редактировать и приглашать)
+    // viewer -> read (только просмотр)
     const accessRights = {
-      organizer: ['read', 'update', 'delete', 'share'],
-      participant: ['read', 'update'],
+      owner: ['read', 'update', 'delete', 'share'],
+      admin: ['read', 'update', 'share'],
       viewer: ['read']
     }
 
-    const typesToGrant = accessRights[role] || accessRights.participant
+    const typesToGrant = accessRights[role] || accessRights.viewer
 
-    // Создаем Access записи если есть userId
+    // НЕ создаем Access записи сразу!
+    // Они будут созданы когда пользователь подтвердит участие (примет приглашение)
+    console.log(`📩 Inviting user with pending role: ${role}, permissions will be: [${typesToGrant.join(', ')}]`)
+    console.log(`🔍 Before adding attendee: targetUserId=${targetUserId}, targetEmail=${targetEmail}`)
+
+    // Добавляем участника в событие (или обновляем если уже есть)
     if (targetUserId) {
-      for (const type of typesToGrant) {
-        const accessName = `event.${type}.${new mongoose.Types.ObjectId().toString()}`
-        await Access.grantAccess(
-          targetUserId,
-          'event',
-          type,
-          event._id,
-          accessName
-        )
-      }
-      console.log(`✅ Access records created for event attendee: ${typesToGrant.join(', ')}`)
-
-      // Даем доступ к календарю, в котором находится событие
-      const targetUser = await User.findById(targetUserId)
-      if (targetUser && event.calendar) {
-        // Проверяем, есть ли уже доступ к календарю
-        if (!targetUser.calendars.includes(event.calendar._id)) {
-          // Даем read доступ к календарю через Access
-          const calendarAccessName = `calendar.read.${new mongoose.Types.ObjectId().toString()}`
-          await Access.grantAccess(
-            targetUserId,
-            'calendar',
-            'read',
-            event.calendar._id,
-            calendarAccessName
-          )
-
-          // Добавляем календарь в список пользователя
-          targetUser.addCalendar(event.calendar._id)
-          await targetUser.save()
-          console.log(`✅ Calendar access granted to: ${targetEmail}`)
+      console.log(`👤 Adding user by ID: ${targetUserId}`)
+      // Проверяем, есть ли уже этот участник
+      const existingAttendeeIndex = event.attendees.findIndex(a => {
+        if (a.user) {
+          const attendeeUserId = typeof a.user === 'object' && a.user._id
+            ? a.user._id.toString()
+            : a.user.toString()
+          return attendeeUserId === targetUserId.toString()
         }
-      }
-    }
+        return false
+      })
 
-    // Добавляем участника в событие
-    if (targetUserId) {
-      event.addAttendee(targetUserId, true)
+      if (existingAttendeeIndex < 0) {
+        // Новый участник, добавляем
+        console.log(`➕ Adding new attendee with userId=${targetUserId}, role=${role}`)
+        event.addAttendee(new mongoose.Types.ObjectId(targetUserId), true, role)
+      } else {
+        console.log(`ℹ️ Attendee already exists at index ${existingAttendeeIndex}`)
+      }
     } else if (targetEmail) {
-      event.addAttendee(targetEmail, false)
+      console.log(`📧 Adding user by email only: ${targetEmail}`)
+      event.addAttendee(targetEmail, false, role)
     }
 
     await event.save()
@@ -428,24 +642,75 @@ class EventsService {
             event.title,
             event.start,
             event.end,
-            role || 'participant'
+            role || 'viewer',
+            event._id.toString()
           ),
         })
-        console.log(`✅ Event invite email sent to ${targetEmail}`)
       }
     } catch (emailError) {
-      console.error('❌ Failed to send event invite email:', emailError.message)
-      // Не бросаем ошибку, участник уже добавлен
+      console.error('❌ Email error:', emailError.message)
     }
 
-    return event
+    // Добавляем роли к attendees перед возвратом (аналогично getEventById)
+    const eventObj = event.toObject()
+    if (eventObj.attendees && eventObj.attendees.length > 0) {
+      const attendeesWithRoles = await Promise.all(
+        eventObj.attendees.map(async (attendee) => {
+          // Если attendee без user (только email), то viewer (по умолчанию)
+          if (!attendee.user) {
+            return { ...attendee, role: 'viewer' }
+          }
+
+          // Получаем ID пользователя
+          const attendeeUserId = typeof attendee.user === 'object' && attendee.user._id
+            ? attendee.user._id.toString()
+            : attendee.user.toString()
+
+          // Организатор всегда имеет роль owner
+          if (attendeeUserId === event.organizer.toString()) {
+            return { ...attendee, role: 'owner' }
+          }
+
+          // Получаем Access записи для этого пользователя и события
+          const accesses = await Access.find({
+            user: attendeeUserId,
+            controls: 'event',
+            entity_id: event._id
+          })
+
+          // Если нет Access записей, но есть pending_role - используем его (приглашение не принято)
+          if (accesses.length === 0 && attendee.pending_role) {
+            return { ...attendee, role: attendee.pending_role }
+          }
+
+          // Определяем роль на основе прав доступа
+          const permissions = accesses.map(a => a.type)
+          let role = 'viewer' // default
+
+          if (permissions.includes('share') && permissions.includes('delete')) {
+            role = 'owner'
+          } else if (permissions.includes('share') && permissions.includes('update')) {
+            role = 'admin'
+          } else if (permissions.includes('read') && !permissions.includes('update')) {
+            role = 'viewer'
+          }
+
+          return { ...attendee, role }
+        })
+      )
+
+      eventObj.attendees = attendeesWithRoles
+    }
+
+    return eventObj
   }
 
   /**
    * Обновить статус участника
    */
   async updateAttendeeStatus(eventId, userId, status) {
-    const event = await Event.findById(eventId)
+    console.log(`🔄 updateAttendeeStatus: eventId=${eventId}, userId=${userId}, status=${status}`)
+    const event = await Event.findById(eventId).populate('attendees.user')
 
     if (!event) {
       const error = new Error('Event not found')
@@ -453,17 +718,85 @@ class EventsService {
       throw error
     }
 
+    // Находим участника
+    const attendee = event.attendees.find(a => {
+      if (a.user) {
+        const attendeeUserId = typeof a.user === 'object' && a.user._id
+          ? a.user._id.toString()
+          : a.user.toString()
+        return attendeeUserId === userId
+      }
+      return false
+    })
+
+    if (!attendee) {
+      console.log(`❌ Attendee not found for userId=${userId}`)
+      console.log(`Available attendees:`, event.attendees.map(a => ({
+        user: a.user ? (typeof a.user === 'object' ? a.user._id : a.user) : null,
+        email: a.email,
+        status: a.status,
+        pending_role: a.pending_role
+      })))
+      const error = new Error('You are not an attendee of this event')
+      error.status = 404
+      throw error
+    }
+
+    console.log(`✅ Found attendee:`, {
+      user: attendee.user,
+      email: attendee.email,
+      status: attendee.status,
+      pending_role: attendee.pending_role
+    })
+
+    // Обновляем статус
     event.updateAttendeeStatus(userId, status, true)
+
+    // Если статус = accepted и есть pending_role, создаем Access записи
+    if (status === 'accepted' && attendee.pending_role) {
+      const accessRights = {
+        owner: ['read', 'update', 'delete', 'share'],
+        admin: ['read', 'update', 'share'],
+        viewer: ['read']
+      }
+
+      const typesToGrant = accessRights[attendee.pending_role] || accessRights.viewer
+
+      // Удаляем старые Access записи (если были)
+      await Access.deleteMany({
+        user: userId,
+        controls: 'event',
+        entity_id: event._id
+      })
+
+      // Создаем новые Access записи
+      for (const type of typesToGrant) {
+        const accessName = `event.${type}.${new mongoose.Types.ObjectId().toString()}`
+        await Access.grantAccess(
+          userId,
+          'event',
+          type,
+          event._id,
+          accessName
+        )
+      }
+
+      console.log(`✅ Access granted on acceptance: role=${attendee.pending_role}, permissions=[${typesToGrant.join(', ')}]`)
+
+      // Очищаем pending_role после создания Access
+      attendee.pending_role = undefined
+    }
+
     await event.save()
 
     return event
   }
 
   /**
-   * Удалить участника (и его Access записи)
+   * Обновить роль участника события
    */
-  async removeAttendee(eventId, userId, attendeeId) {
-    const event = await Event.findById(eventId).populate('calendar')
+  async updateAttendeeRole(eventId, userId, attendeeId, newRole) {
+    const event = await Event.findById(eventId).populate('calendar').populate('attendees.user')
 
     if (!event) {
       const error = new Error('Event not found')
@@ -471,27 +804,177 @@ class EventsService {
       throw error
     }
 
-    if (!event.hasAccess(userId)) {
-      const error = new Error('Access denied')
+    // Проверяем права доступа - только организатор может изменять роли
+    const isOrganizer = event.organizer.toString() === userId
+
+    if (!isOrganizer) {
+      const error = new Error('Only organizer can change attendee roles')
       error.status = 403
       throw error
     }
 
-    // Удаляем ВСЕ Access записи для этого участника и события
-    const accessTypes = ['read', 'update', 'delete', 'share']
-    for (const type of accessTypes) {
+    // Находим участника по attendeeId (это _id из subdocument, не ObjectId пользователя)
+    const attendee = event.attendees.find(a => a._id.toString() === attendeeId)
+
+    if (!attendee || !attendee.user) {
+      const error = new Error('Attendee not found')
+      error.status = 404
+      throw error
+    }
+
+    // Получаем реальный userId
+    const targetUserId = typeof attendee.user === 'object' && attendee.user._id
+      ? attendee.user._id.toString()
+      : attendee.user.toString()
+
+    // Нельзя изменять роль организатора
+    if (targetUserId === event.organizer.toString()) {
+      const error = new Error('Cannot change organizer role')
+      error.status = 400
+      throw error
+    }
+
+    // Удаляем старые Access записи для этого пользователя
+    const allAccessTypes = ['read', 'update', 'delete', 'share']
+    for (const type of allAccessTypes) {
       await Access.revokeAccess(
-        attendeeId,
+        targetUserId,
         'event',
         type,
         event._id
       )
     }
 
+    // Создаем новые Access записи на основе роли
+    const accessRights = {
+      owner: ['read', 'update', 'delete', 'share'],
+      admin: ['read', 'update', 'share'],
+      viewer: ['read']
+    }
+
+    const typesToGrant = accessRights[newRole] || accessRights.viewer
+
+    for (const type of typesToGrant) {
+      const accessName = `event.${type}.${new mongoose.Types.ObjectId().toString()}`
+      await Access.grantAccess(
+        targetUserId,
+        'event',
+        type,
+        event._id,
+        accessName
+      )
+    }
+
+    console.log(`✅ Attendee role updated to ${newRole} with permissions: ${typesToGrant.join(', ')}`)
+
+    // Перезагружаем событие с attendees
+    const updatedEvent = await Event.findById(eventId).populate('attendees.user')
+
+    // Добавляем роли к attendees перед возвратом
+    const eventObj = updatedEvent.toObject()
+    if (eventObj.attendees && eventObj.attendees.length > 0) {
+      const attendeesWithRoles = await Promise.all(
+        eventObj.attendees.map(async (attendee) => {
+          // Если attendee без user (только email), то viewer (по умолчанию)
+          if (!attendee.user) {
+            return { ...attendee, role: 'viewer' }
+          }
+
+          // Получаем ID пользователя
+          const attendeeUserId = typeof attendee.user === 'object' && attendee.user._id
+            ? attendee.user._id.toString()
+            : attendee.user.toString()
+
+          // Организатор всегда имеет роль owner
+          if (attendeeUserId === updatedEvent.organizer.toString()) {
+            return { ...attendee, role: 'owner' }
+          }
+
+          // Получаем Access записи для этого пользователя и события
+          const accesses = await Access.find({
+            user: attendeeUserId,
+            controls: 'event',
+            entity_id: eventId
+          })
+
+          // Определяем роль на основе прав доступа
+          const permissions = accesses.map(a => a.type)
+          let role = 'viewer' // default
+
+          if (permissions.includes('share') && permissions.includes('delete')) {
+            role = 'owner'
+          } else if (permissions.includes('share') && permissions.includes('update')) {
+            role = 'admin'
+          } else if (permissions.includes('read') && !permissions.includes('update')) {
+            role = 'viewer'
+          }
+
+          return { ...attendee, role }
+        })
+      )
+
+      eventObj.attendees = attendeesWithRoles
+    }
+
+    return eventObj
+  }
+
+  /**
+   * Удалить участника (и его Access записи)
+   */
+  async removeAttendee(eventId, userId, attendeeId) {
+    console.log(`🗑️ removeAttendee: eventId=${eventId}, userId=${userId}, attendeeId=${attendeeId}`)
+    const event = await Event.findById(eventId).populate('calendar').populate('attendees.user')
+
+    if (!event) {
+      const error = new Error('Event not found')
+      error.status = 404
+      throw error
+    }
+
+    // Проверяем права: либо есть доступ к событию, либо пользователь - организатор
+    const hasAccess = event.hasAccess(userId) || event.organizer.toString() === userId
+    if (!hasAccess) {
+      console.log(`❌ Access denied: userId=${userId}, organizer=${event.organizer}, hasAccess=${event.hasAccess(userId)}`)
+      const error = new Error('Access denied')
+      error.status = 403
+      throw error
+    }
+
+    // Находим участника в массиве
+    const attendee = event.attendees.find(a => a._id && a._id.toString() === attendeeId)
+
+    if (!attendee) {
+      console.log(`❌ Attendee not found: attendeeId=${attendeeId}`)
+      console.log(`Available attendees:`, event.attendees.map(a => ({ _id: a._id, user: a.user })))
+      const error = new Error('Attendee not found')
+      error.status = 404
+      throw error
+    }
+
+    console.log(`✅ Found attendee to remove:`, { _id: attendee._id, user: attendee.user, email: attendee.email })
+
+    // Если у участника есть user, удаляем Access записи
+    if (attendee.user) {
+      const targetUserId = typeof attendee.user === 'object' && attendee.user._id
+        ? attendee.user._id.toString()
+        : attendee.user.toString()
+
+      console.log(`🔐 Revoking access for user: ${targetUserId}`)
+      const accessTypes = ['read', 'update', 'delete', 'share']
+      for (const type of accessTypes) {
+        await Access.revokeAccess(
+          targetUserId,
+          'event',
+          type,
+          event._id
+        )
+      }
+    }
+
     event.removeAttendee(attendeeId, true)
     await event.save()
-
-    console.log(`✅ All access records removed for attendee on event ${event.title}`)
+    console.log(`✅ Attendee removed successfully`)
 
     return event
   }

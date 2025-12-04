@@ -42,6 +42,12 @@ class CalendarApiClass {
     const response = await api.delete(`/calendars/${calendarId}/share`, { data });
     return response.data;
   }
+
+  // Subscribe to calendar via public link (self-subscription)
+  async subscribe(calendarId, data = {}) {
+    const response = await api.post(`/calendars/${calendarId}/subscribe`, data);
+    return response.data;
+  }
 }
 
 export const CalendarApi = new CalendarApiClass();

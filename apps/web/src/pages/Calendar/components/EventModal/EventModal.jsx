@@ -150,7 +150,34 @@ export const EventModal = () => {
     return attendee ? attendee.status : null;
   }, [selectedEvent, user]);
 
-  const isAttendee = myAttendeeStatus !== null;
+  // Проверяем является ли пользователь создателем события
+  const isCreator = React.useMemo(() => {
+    if (!selectedEvent || !user) return false;
+    const creatorId = selectedEvent.creator?._id || selectedEvent.creator;
+    const result = creatorId?.toString() === user._id?.toString();
+    console.log('🔍 isCreator check:', { creatorId, userId: user._id, result });
+    return result;
+  }, [selectedEvent, user]);
+
+  // Проверяем является ли пользователь владельцем календаря
+  const isCalendarOwner = React.useMemo(() => {
+    if (!selectedEvent || !user || !calendars) return false;
+    const calendar = calendars.find(c => c.id === selectedEvent.calendarId || c._id === selectedEvent.calendarId);
+    if (!calendar) {
+      console.log('⚠️ Calendar not found for event:', selectedEvent.calendarId);
+      return false;
+    }
+    const ownerId = calendar.owner?._id || calendar.owner;
+    const result = ownerId?.toString() === user._id?.toString();
+    console.log('🔍 isCalendarOwner check:', { ownerId, userId: user._id, result });
+    return result;
+  }, [selectedEvent, user, calendars]);
+
+  // Пользователь может редактировать если он создатель ИЛИ владелец календаря
+  const canEdit = isCreator || isCalendarOwner;
+
+  // Пользователь является только attendee (не может редактировать) если он в attendees И НЕ создатель И НЕ владелец
+  const isAttendee = myAttendeeStatus !== null && !canEdit;
 
   async function handleUpdateMyStatus(status) {
     if (!selectedEvent) return;
