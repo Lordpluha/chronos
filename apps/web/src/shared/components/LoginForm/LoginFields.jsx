@@ -14,6 +14,7 @@ export function LoginFields({ register, errors, isLoading, showPassword, setShow
           type="text"
           placeholder="m@example.com or username"
           disabled={isLoading}
+          aria-invalid={!!errors.login}
           {...register("login")}
         />
         {errors.login && <FieldError>{errors.login.message}</FieldError>}
@@ -33,6 +34,7 @@ export function LoginFields({ register, errors, isLoading, showPassword, setShow
             id="password"
             type={showPassword ? "text" : "password"}
             disabled={isLoading}
+            aria-invalid={!!errors.password}
             {...register("password")}
           />
           <button

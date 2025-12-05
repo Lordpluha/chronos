@@ -179,9 +179,7 @@ class EventsService {
     eventsAsAttendee = await Event.find(attendeeQuery)
       .populate('creator organizer calendar')
       .populate('attendees.user')
-      .sort({ start: 1 })
-
-    // Объединяем оба списка
+      .sort({ start: 1 })    // Объединяем оба списка
     let events = [...eventsFromCalendars, ...eventsAsAttendee]
 
     // Удаляем дубликаты по _id
@@ -388,8 +386,24 @@ class EventsService {
 
     // 2. Проверяем через календарь (если нет прямых прав на событие)
     let hasCalendarWriteAccess = false
-    if (event.calendar && typeof event.calendar !== 'string') {
-      hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
+    if (event.calendar) {
+      const calendarId = event.calendar._id || event.calendar
+
+      // Проверяем через новую систему Access records для календаря
+      // Если у пользователя есть 'update' право на календарь - он может редактировать события
+      const calendarAccess = await Access.findOne({
+        user: userId,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'update'
+      })
+
+      if (calendarAccess) {
+        hasCalendarWriteAccess = true
+      } else if (typeof event.calendar !== 'string') {
+        // Fallback на старую систему shared_with
+        hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
+      }
     }
 
     // 3. Проверяем, является ли пользователь организатором
@@ -529,15 +543,31 @@ class EventsService {
     })
 
     // 2. Проверяем через календарь (если нет прямых прав на событие)
-    let hasCalendarWriteAccess = false
-    if (event.calendar && typeof event.calendar !== 'string') {
-      hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
+    let hasCalendarDeleteAccess = false
+    if (event.calendar) {
+      const calendarId = event.calendar._id || event.calendar
+
+      // Проверяем через новую систему Access records для календаря
+      // Если у пользователя есть 'delete' право на календарь - он может удалять события
+      const calendarAccess = await Access.findOne({
+        user: userId,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'delete'
+      })
+
+      if (calendarAccess) {
+        hasCalendarDeleteAccess = true
+      } else if (typeof event.calendar !== 'string') {
+        // Fallback на старую систему shared_with
+        hasCalendarDeleteAccess = event.calendar.hasAccess(userId, 'write')
+      }
     }
 
     // 3. Проверяем, является ли пользователь организатором
     const isOrganizer = event.organizer.toString() === userId
 
-    if (!eventAccess && !hasCalendarWriteAccess && !isOrganizer) {
+    if (!eventAccess && !hasCalendarDeleteAccess && !isOrganizer) {
       const error = new Error('Access denied')
       error.status = 403
       throw error
@@ -575,8 +605,6 @@ class EventsService {
     // Если не указан email и user_id, добавляем текущего пользователя
     const { user_id, email, role } = attendeeData
 
-    console.log(`🔍 addAttendee called with: user_id=${user_id}, email=${email}, role=${role}`)
-
     let targetUserId = user_id
     let targetEmail = email
 
@@ -598,13 +626,32 @@ class EventsService {
       })
 
       // Или через календарь (если нет прямых прав на событие)
-      const hasCalendarAccess = event.hasAccess(userId)
+      let hasCalendarShareAccess = false
+      if (event.calendar) {
+        const calendarId = event.calendar._id || event.calendar
+
+        // Проверяем через новую систему Access records для календаря
+        // Если у пользователя есть 'share' право на календарь - он может приглашать в события
+        const calendarAccess = await Access.findOne({
+          user: userId,
+          controls: 'calendar',
+          entity_id: calendarId,
+          type: 'share'
+        })
+
+        if (calendarAccess) {
+          hasCalendarShareAccess = true
+        } else {
+          // Fallback на старую систему
+          hasCalendarShareAccess = event.hasAccess(userId)
+        }
+      }
 
       // Или если пользователь - организатор
       const isOrganizer = event.organizer.toString() === userId
 
-      if (!hasShareAccess && !hasCalendarAccess && !isOrganizer) {
-        console.log(`❌ Access denied: userId=${userId}, hasShareAccess=${!!hasShareAccess}, hasCalendarAccess=${hasCalendarAccess}, isOrganizer=${isOrganizer}`)
+      if (!hasShareAccess && !hasCalendarShareAccess && !isOrganizer) {
+        console.log(`❌ Access denied: userId=${userId}, hasShareAccess=${!!hasShareAccess}, hasCalendarShareAccess=${hasCalendarShareAccess}, isOrganizer=${isOrganizer}`)
         const error = new Error('Access denied')
         error.status = 403
         throw error
@@ -656,6 +703,8 @@ class EventsService {
     // Они будут созданы когда пользователь подтвердит участие (примет приглашение)
 
     // Добавляем участника в событие (или обновляем если уже есть)
+    let isNewAttendee = false
+
     if (targetUserId) {
       // Проверяем, есть ли уже этот участник
       const existingAttendeeIndex = event.attendees.findIndex(a => {
@@ -671,33 +720,44 @@ class EventsService {
       if (existingAttendeeIndex < 0) {
         // Новый участник, добавляем
         event.addAttendee(new mongoose.Types.ObjectId(targetUserId), true, role)
+        isNewAttendee = true
       }
     } else if (targetEmail) {
-      event.addAttendee(targetEmail, false, role)
+      // Проверяем есть ли участник с таким email
+      const existingEmailAttendee = event.attendees.find(a => a.email === targetEmail)
+      if (!existingEmailAttendee) {
+        event.addAttendee(targetEmail, false, role)
+        isNewAttendee = true
+      }
     }
 
     await event.save()
 
-    // Отправляем email приглашение
-    try {
-      const organizer = await User.findById(userId)
+    // Отправляем email приглашение ТОЛЬКО для новых участников
+    if (isNewAttendee) {
+      try {
+        const organizer = await User.findById(userId)
 
-      if (targetEmail && organizer) {
-        await EmailUtils.sendEmail({
-          to: targetEmail,
-          subject: `You're invited to: ${event.title}`,
-          html: EmailUtils.generateEventInviteEmail(
-            organizer.login,
-            event.title,
-            event.start,
-            event.end,
-            role || 'viewer',
-            event._id.toString()
-          ),
-        })
+        if (targetEmail && organizer) {
+          await EmailUtils.sendEmail({
+            to: targetEmail,
+            subject: `You're invited to: ${event.title}`,
+            html: EmailUtils.generateEventInviteEmail(
+              organizer.login,
+              event.title,
+              event.start,
+              event.end,
+              role || 'viewer',
+              event._id.toString()
+            ),
+          })
+          console.log(`✅ Event invitation email sent to ${targetEmail}`)
+        }
+      } catch (emailError) {
+        console.error('❌ Email error:', emailError.message)
       }
-    } catch (emailError) {
-      console.error('❌ Email error:', emailError.message)
+    } else {
+      console.log(`📝 Attendee already exists, no email sent`)
     }
 
     // Добавляем роли к attendees перед возвратом (аналогично getEventById)
@@ -856,7 +916,25 @@ class EventsService {
       type: 'delete' // Owner имеет delete, admin - нет
     })
 
-    if (!isOrganizer && !hasOwnerRole) {
+    // Проверяем доступ через календарь (admin или owner календаря могут менять роли)
+    let hasCalendarOwnerAccess = false
+    if (event.calendar) {
+      const calendarId = event.calendar._id || event.calendar
+
+      // Проверяем через новую систему Access records для календаря
+      const calendarAccess = await Access.findOne({
+        user: userId,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'delete' // delete = admin/owner календаря
+      })
+
+      if (calendarAccess) {
+        hasCalendarOwnerAccess = true
+      }
+    }
+
+    if (!isOrganizer && !hasOwnerRole && !hasCalendarOwnerAccess) {
       const error = new Error('Only organizer or owner can change attendee roles')
       error.status = 403
       throw error
@@ -999,7 +1077,6 @@ class EventsService {
 
     // Проверяем права: организатор, owner (delete право) или доступ через календарь
     const isOrganizer = event.organizer.toString() === userId
-    const hasCalendarAccess = event.hasAccess(userId)
 
     // Проверяем есть ли у пользователя роль owner (права delete)
     const hasOwnerRole = await Access.findOne({
@@ -1009,8 +1086,29 @@ class EventsService {
       type: 'delete' // Owner имеет delete, admin - нет
     })
 
-    if (!isOrganizer && !hasCalendarAccess && !hasOwnerRole) {
-      console.log(`❌ Access denied: userId=${userId}, organizer=${event.organizer}, hasCalendarAccess=${hasCalendarAccess}, hasOwnerRole=${!!hasOwnerRole}`)
+    // Проверяем доступ через календарь
+    let hasCalendarDeleteAccess = false
+    if (event.calendar) {
+      const calendarId = event.calendar._id || event.calendar
+
+      // Проверяем через новую систему Access records для календаря
+      const calendarAccess = await Access.findOne({
+        user: userId,
+        controls: 'calendar',
+        entity_id: calendarId,
+        type: 'delete'
+      })
+
+      if (calendarAccess) {
+        hasCalendarDeleteAccess = true
+      } else {
+        // Fallback на старую систему
+        hasCalendarDeleteAccess = event.hasAccess(userId)
+      }
+    }
+
+    if (!isOrganizer && !hasCalendarDeleteAccess && !hasOwnerRole) {
+      console.log(`❌ Access denied: userId=${userId}, organizer=${event.organizer}, hasCalendarDeleteAccess=${hasCalendarDeleteAccess}, hasOwnerRole=${!!hasOwnerRole}`)
       const error = new Error('Access denied')
       error.status = 403
       throw error

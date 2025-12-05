@@ -69,10 +69,13 @@ export function CalendarPage() {
               // Если есть action=accept, принимаем приглашение
               if (action === 'accept') {
                 try {
-                  await EventApi.updateMyStatus(eventId, 'accepted');
+                  const updatedEvent = await EventApi.updateMyStatus(eventId, 'accepted');
 
                   // Перезагружаем события чтобы получить обновленный список
                   await refetchEvents();
+
+                  // Даем время React Query обновить кэш
+                  await new Promise(resolve => setTimeout(resolve, 1000));
 
                   // Очищаем query параметры
                   searchParams.delete('event');
@@ -161,6 +164,43 @@ export function CalendarPage() {
             });
             // Очищаем query параметр
             searchParams.delete('cal');
+            setSearchParams(searchParams, { replace: true });
+            setProcessedCalendarId(null);
+          });
+      });
+    }
+
+    // Обработка приглашения в календарь: ?calendar=ID&action=accept
+    const calendarInviteId = searchParams.get('calendar');
+    if (calendarInviteId && action === 'accept' && !processedCalendarId) {
+      setProcessedCalendarId(calendarInviteId);
+
+      import('@entities/Calendar/api/CalendarApi').then(({ CalendarApi }) => {
+        CalendarApi.acceptInvitation(calendarInviteId)
+          .then(async (calendarData) => {
+            // Перезагружаем календари чтобы получить обновленный список
+            await refetchCalendars();
+
+            // Очищаем query параметры
+            searchParams.delete('calendar');
+            searchParams.delete('action');
+            setSearchParams(searchParams, { replace: true });
+            setProcessedCalendarId(null);
+
+            // Показываем уведомление
+            import('sonner').then(({ toast }) => {
+              toast.success(`Calendar invitation accepted! "${calendarData.calendar?.title || 'Calendar'}" has been added to your calendars`);
+            });
+          })
+          .catch(error => {
+            console.error('❌ Failed to accept calendar invitation:', error);
+            // Показываем уведомление пользователю
+            import('sonner').then(({ toast }) => {
+              toast.error(error.response?.data?.message || 'Failed to accept calendar invitation');
+            });
+            // Очищаем query параметры
+            searchParams.delete('calendar');
+            searchParams.delete('action');
             setSearchParams(searchParams, { replace: true });
             setProcessedCalendarId(null);
           });

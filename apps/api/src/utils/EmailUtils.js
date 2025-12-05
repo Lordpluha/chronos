@@ -27,7 +27,7 @@ export class EmailUtilsClass {
     `
   }
 
-  generateCalendarShareEmail(ownerName, calendarTitle, permission) {
+  generateCalendarShareEmail(ownerName, calendarTitle, permission, calendarId) {
     const permissionText = {
       read: 'view',
       write: 'edit',
@@ -36,21 +36,21 @@ export class EmailUtilsClass {
 
     return `
       <div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:24px;border-radius:8px;background:#f9f9f9;border:1px solid #eee;">
-        <h2 style="color:#6366f1;text-align:center;">📅 Calendar Shared With You</h2>
+        <h2 style="color:#6366f1;text-align:center;">📅 Calendar Invitation</h2>
         <p>Hello!</p>
-        <p><strong>${ownerName}</strong> has shared a calendar with you on Chronos.</p>
+        <p><strong>${ownerName}</strong> has invited you to join a calendar on Chronos.</p>
 
         <div style="background:#fff;padding:16px;border-radius:6px;margin:16px 0;border-left:4px solid #6366f1;">
           <p style="margin:0;font-size:1.1em;font-weight:bold;color:#333;">${calendarTitle}</p>
           <p style="margin:8px 0 0 0;color:#666;">Permission: <strong>${permissionText}</strong></p>
         </div>
 
-        <p>You can now access this calendar in your Chronos dashboard.</p>
+        <p>Click the button below to accept this invitation and add the calendar to your account.</p>
 
         <div style="text-align:center;margin:24px 0;">
-          <a href="http://localhost:5173/calendar"
-             style="display:inline-block;padding:12px 32px;background:#6366f1;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
-            Open Calendar
+          <a href="http://localhost:5173/calendar?calendar=${calendarId}&action=accept"
+             style="display:inline-block;padding:12px 32px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+            ✓ Accept Invitation
           </a>
         </div>
 

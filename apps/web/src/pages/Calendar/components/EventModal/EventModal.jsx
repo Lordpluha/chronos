@@ -116,6 +116,17 @@ export const EventModal = () => {
       return;
     }
 
+    // Валидация времени
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    const [endHours, endMinutes] = endTime.split(':').map(Number);
+    const startTotalMinutes = startHours * 60 + startMinutes;
+    const endTotalMinutes = endHours * 60 + endMinutes;
+
+    if (endTotalMinutes <= startTotalMinutes) {
+      toast.error("End time must be after start time");
+      return;
+    }
+
     const calendarEvent = {
       title,
       description,

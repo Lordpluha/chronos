@@ -129,6 +129,27 @@ router.post(
   },
 )
 
+// POST /calendars/:calendarId/accept - принять приглашение в календарь
+router.post(
+  '/calendars/:calendarId/accept',
+  requireAccessToken,
+  async (req, res) => {
+    try {
+      const calendar = await calendarsService.acceptCalendarInvitation(
+        req.params.calendarId,
+        req.userId,
+      )
+      return res.json({
+        message: 'Calendar invitation accepted',
+        calendar,
+      })
+    } catch (err) {
+      console.error('❌ Error accepting calendar invitation:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
 // DELETE /calendars/:calendarId/share - удалить доступ к календарю
 router.delete(
   '/calendars/:calendarId/share',
@@ -325,6 +346,7 @@ router.patch(
         req.userId,
         req.body.status,
       )
+
       return res.json({
         message: 'Attendee status updated successfully',
         event,

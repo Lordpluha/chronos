@@ -48,6 +48,12 @@ class CalendarApiClass {
     const response = await api.post(`/calendars/${calendarId}/subscribe`, data);
     return response.data;
   }
+
+  // Accept calendar invitation
+  async acceptInvitation(calendarId) {
+    const response = await api.post(`/calendars/${calendarId}/accept`);
+    return response.data;
+  }
 }
 
 export const CalendarApi = new CalendarApiClass();

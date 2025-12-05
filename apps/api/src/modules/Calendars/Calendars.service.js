@@ -222,6 +222,15 @@ class CalendarsService {
 
     const typesToGrant = accessTypes[permission] || ['read']
 
+    // Проверяем, есть ли у пользователя уже доступ к этому календарю
+    const existingAccess = await Access.findOne({
+      user: targetUser._id,
+      controls: 'calendar',
+      entity_id: calendar._id
+    })
+
+    const isNewInvitation = !existingAccess
+
     // Создаем Access записи для каждого типа
     for (const type of typesToGrant) {
       const accessName = `calendar.${type}.${new mongoose.Types.ObjectId().toString()}`
@@ -238,30 +247,37 @@ class CalendarsService {
     calendar.shareWith(targetUser._id, permission)
     await calendar.save()
 
-    // Добавляем календарь в список пользователя
-    targetUser.addCalendar(calendar._id)
-    await targetUser.save()
+    // НЕ добавляем календарь в список пользователя сразу!
+    // Пользователь должен принять приглашение через /calendars/:id/accept
+    // targetUser.addCalendar(calendar._id)
+    // await targetUser.save()
 
-    // Получаем владельца для email
-    const owner = await User.findById(userId)
+    // Отправляем email ТОЛЬКО если это новое приглашение (не смена роли)
+    if (isNewInvitation) {
+      // Получаем владельца для email
+      const owner = await User.findById(userId)
 
-    // Отправляем email уведомление
-    try {
-      await EmailUtils.sendEmail({
-        to: targetUser.email,
-        subject: `${owner.login} shared a calendar with you`,
-        html: EmailUtils.generateCalendarShareEmail(
-          owner.login,
-          calendar.title,
-          permission
-        ),
-      })
-      console.log(`✅ Calendar share email sent to ${targetUser.email}`)
-      console.log(`✅ Access records created for ${targetUser.email}: ${typesToGrant.join(', ')}`)
-    } catch (emailError) {
-      console.error('❌ Failed to send calendar share email:', emailError.message)
-      // Не бросаем ошибку, календарь уже расшарен
+      try {
+        await EmailUtils.sendEmail({
+          to: targetUser.email,
+          subject: `${owner.login} invited you to join a calendar`,
+          html: EmailUtils.generateCalendarShareEmail(
+            owner.login,
+            calendar.title,
+            permission,
+            calendar._id.toString()
+          ),
+        })
+        console.log(`✅ Calendar invitation email sent to ${targetUser.email}`)
+      } catch (emailError) {
+        console.error('❌ Failed to send calendar invitation email:', emailError.message)
+        // Не бросаем ошибку, доступы уже созданы
+      }
+    } else {
+      console.log(`📝 Calendar permissions updated for ${targetUser.email} (no email sent)`)
     }
+
+    console.log(`✅ Access records created/updated for ${targetUser.email}: ${typesToGrant.join(', ')}`)
 
     return calendar
   }  /**
@@ -528,6 +544,48 @@ class CalendarsService {
     console.log(`✅ User ${targetUser.email} subscribed to calendar "${calendar.title}"`);
 
     return calendar;
+  }
+
+  /**
+   * Принять приглашение в календарь
+   */
+  async acceptCalendarInvitation(calendarId, userId) {
+    const calendar = await Calendar.findById(calendarId)
+
+    if (!calendar) {
+      const error = new Error('Calendar not found')
+      error.status = 404
+      throw error
+    }
+
+    const user = await User.findById(userId)
+    if (!user) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    // Проверяем, есть ли у пользователя доступ к этому календарю
+    const hasAccess = await Access.hasAccess(userId, 'calendar', 'read', calendarId)
+    if (!hasAccess) {
+      const error = new Error('No invitation found for this calendar')
+      error.status = 403
+      throw error
+    }
+
+    // Проверяем, не добавлен ли календарь уже
+    if (user.calendars.includes(calendarId)) {
+      console.log('✅ Calendar already accepted')
+      return calendar
+    }
+
+    // Добавляем календарь в список пользователя
+    user.addCalendar(calendarId)
+    await user.save()
+
+    console.log(`✅ User ${user.email} accepted invitation to calendar "${calendar.title}"`)
+
+    return calendar
   }
 }
 

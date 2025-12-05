@@ -3,8 +3,30 @@ import { toast } from 'sonner';
 import { RemindersApi } from '../api/RemindersApi';
 import { useQueryClient } from '@tanstack/react-query';
 
+const DISMISSED_REMINDERS_KEY = 'dismissedReminders';
+
+// Load dismissed reminders from localStorage
+const loadDismissedReminders = () => {
+  try {
+    const stored = localStorage.getItem(DISMISSED_REMINDERS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+// Save dismissed reminders to localStorage
+const saveDismissedReminders = (dismissedSet) => {
+  try {
+    localStorage.setItem(DISMISSED_REMINDERS_KEY, JSON.stringify([...dismissedSet]));
+  } catch (error) {
+    console.error('Failed to save dismissed reminders:', error);
+  }
+};
+
 export const useReminderNotifications = (reminders) => {
   const notifiedRef = useRef(new Set());
+  const dismissedRef = useRef(loadDismissedReminders());
   const queryClient = useQueryClient();
 
   const handleSnooze = async (reminder, minutes) => {
@@ -39,6 +61,10 @@ export const useReminderNotifications = (reminders) => {
       notifiedRef.current.delete(`${reminder._id}-5min`);
       notifiedRef.current.delete(`${reminder._id}-now`);
 
+      // Mark as dismissed permanently
+      dismissedRef.current.add(reminder._id);
+      saveDismissedReminders(dismissedRef.current);
+
       queryClient.invalidateQueries({ queryKey: ['reminders'] });
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ['reminders'] });
@@ -58,6 +84,11 @@ export const useReminderNotifications = (reminders) => {
       const activeReminders = reminders.filter(reminder => !reminder.completed);
 
       activeReminders.forEach(reminder => {
+        // Skip if already dismissed
+        if (dismissedRef.current.has(reminder._id)) {
+          return;
+        }
+
         const reminderTime = new Date(reminder.start);
         const diffMinutes = Math.floor((reminderTime - now) / 60000);
 
