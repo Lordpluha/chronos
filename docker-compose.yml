@@ -28,8 +28,8 @@ services:
       - BACK_HOST=${BACK_HOST:-0.0.0.0}
       - FRONT_HOST=${FRONT_HOST:-localhost}
       - FRONT_PORT=${FRONT_PORT:-5173}
-      # MongoDB Atlas URI - используем облачную БД
-      - MONGODB_URI=mongodb+srv://tesluakevlad_db_user:D4uxcoYQRb2JcYrb@chronos.xaixkpi.mongodb.net/chronos?retryWrites=true&w=majority&appName=chronos
+      # MongoDB - используем локальную БД в Docker
+      - MONGODB_URI=mongodb://admin:admin_password@mongodb:27017/chronos?authSource=admin
       - DB_NAME=${DB_NAME:-chronos}
       - JWT_SECRET=${JWT_SECRET}
       - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
@@ -46,28 +46,24 @@ services:
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
     networks:
       - app_network
-    # Убираем зависимость от локальной MongoDB так как используем Atlas
-    # depends_on:
-    #   - mongodb
+    depends_on:
+      - mongodb
 
-  # Local MongoDB for development only
-  # ОТКЛЮЧЕНО: Используем MongoDB Atlas вместо локальной БД
-  # mongodb:
-  #   container_name: chronos-mongodb
-  #   image: mongo:7.0
-  #   restart: always
-  #   environment:
-  #     - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
-  #     - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-admin_password}
-  #     - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-chronos}
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - mongodb_data:/data/db
-  #   networks:
-  #     - app_network
-  #   profiles:
-  #     - development
+  # Local MongoDB for development
+  mongodb:
+    container_name: chronos-mongodb
+    image: mongo:7.0
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin_password
+      - MONGO_INITDB_DATABASE=chronos
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app_network
 
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
@@ -75,6 +71,6 @@ networks:
   app_network:
     driver: bridge
 
-# Volumes for persistent data (не нужны так как используем Atlas)
-# volumes:
-#   mongodb_data:
+# Volumes for persistent data
+volumes:
+  mongodb_data:

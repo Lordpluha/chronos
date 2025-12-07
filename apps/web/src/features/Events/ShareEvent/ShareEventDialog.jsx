@@ -27,14 +27,18 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
         const userEmail = attendee.user?.email || attendee.email;
         const userId = attendee.user?._id || attendee.user;
         const attendeeId = attendee._id; // ID subdocument для операций (update/delete)
+        const userAvatar = attendee.user?.avatar; // URL аватара если есть
+        const userName = attendee.user?.full_name || attendee.user?.login || userEmail;
 
         return {
           id: attendeeId || index, // Используем attendee._id для операций
           userId: userId, // Сохраняем userId отдельно для справки
           email: userEmail,
+          name: userName,
+          avatarUrl: userAvatar, // URL аватара
+          avatarLetter: userEmail?.[0]?.toUpperCase() || '?', // Первая буква для fallback
           role: attendee.role || attendee.pending_role || 'viewer', // Используем role из backend или pending_role
           status: attendee.status || 'invited',
-          avatar: userEmail?.[0]?.toUpperCase() || '?',
         };
       });
       setAttendees(mappedAttendees);
@@ -70,9 +74,11 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
       const newAttendee = {
         id: Date.now(),
         email,
+        name: email,
+        avatarUrl: null, // Новый участник ещё не имеет аватара
+        avatarLetter: email[0].toUpperCase(),
         role,
         status: 'pending',
-        avatar: email[0].toUpperCase(),
       };
 
       setAttendees([...attendees, newAttendee]);
@@ -202,8 +208,16 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
               {event?.creator && (
                 <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
-                      {event.creator?.email?.[0]?.toUpperCase() || 'C'}
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                      {event.creator?.avatar ? (
+                        <img
+                          src={event.creator.avatar}
+                          alt={event.creator.full_name || event.creator.email}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        event.creator?.email?.[0]?.toUpperCase() || 'C'
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -225,8 +239,16 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                   className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
-                      {attendee.avatar}
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                      {attendee.avatarUrl ? (
+                        <img
+                          src={attendee.avatarUrl}
+                          alt={attendee.name || attendee.email}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        attendee.avatarLetter
+                      )}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{attendee.email}</p>

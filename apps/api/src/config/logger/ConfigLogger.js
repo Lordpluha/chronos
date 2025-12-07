@@ -70,16 +70,14 @@ export function logValidationErrors(errors) {
 }
 
 /**
- * Логирует текущую конфигурацию
- * @param {import("..").Configuration} config - Конфигурационный объект
- * @param {import("..").Environment} env - Текущая среда выполнения
+ * @param {import("..").Configuration} config
+ * @param {import("..").Environment} env
  * @return {void}
  */
 export function logConfiguration(config, env) {
   console.log('\n🔧 Application Configuration:')
   console.log(createTableBorder())
 
-  // Основные настройки
   console.log(formatTableRow('Environment', env))
   console.log(
     formatTableRow(
@@ -94,12 +92,10 @@ export function logConfiguration(config, env) {
     ),
   )
 
-  // База данных (скрываем чувствительную информацию)
   const dbUri = maskSensitiveInfo(config.database.MONGODB_URI)
   console.log(formatTableRow('Database', dbUri))
   console.log(formatTableRow('DB Name', config.database.DB_NAME))
 
-  // JWT (скрываем секрет)
   console.log(formatTableRow('JWT Secret', '*'.repeat(20)))
   console.log(
     formatTableRow('Access Token TTL', config.jwt.ACCESS_TOKEN_LIFETIME),
@@ -108,7 +104,6 @@ export function logConfiguration(config, env) {
     formatTableRow('Refresh Token TTL', config.jwt.REFRESH_TOKEN_LIFETIME),
   )
 
-  // Email (скрываем пароль)
   console.log(
     formatTableRow(
       'SMTP',
@@ -118,7 +113,6 @@ export function logConfiguration(config, env) {
   console.log(formatTableRow('SMTP User', config.email.SMTP_USER))
   console.log(formatTableRow('SMTP Pass', '*'.repeat(10)))
 
-  // OAuth (скрываем секрет)
   console.log(
     formatTableRow(
       'OAuth Client',

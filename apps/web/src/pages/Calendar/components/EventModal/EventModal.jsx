@@ -227,14 +227,14 @@ export const EventModal = () => {
       <Dialog open={showEventModal} onOpenChange={setShowEventModal}>
         <DialogContent
         ref={modalRef}
-        className="sm:max-w-[500px] p-0 gap-0"
+        className="sm:max-w-[500px] max-w-[95vw] p-0 gap-0 max-h-[90vh] md:max-h-[85vh]"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           transition: isDragging ? 'none' : 'transform 0.2s ease-out',
         }}
       >
         <DialogHeader
-          className="px-6 py-4 border-b bg-gray-50 dark:bg-gray-800 flex flex-row items-center justify-between space-y-0"
+          className="px-4 md:px-6 py-3 md:py-4 border-b bg-gray-50 dark:bg-gray-800 flex flex-row items-center justify-between space-y-0"
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2" data-draggable="true">

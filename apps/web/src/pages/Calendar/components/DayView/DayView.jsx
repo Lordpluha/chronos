@@ -292,21 +292,21 @@ export const DayView = () => {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800">
       {/* Day header */}
-      <div className={`p-6 border-b dark:border-gray-700 ${isToday ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-gray-900/50'}`}>
-        <div className="text-sm text-gray-500 dark:text-gray-400 uppercase">
+      <div className={`p-3 md:p-6 border-b dark:border-gray-700 ${isToday ? 'bg-blue-50 dark:bg-blue-900/30' : 'bg-gray-50 dark:bg-gray-900/50'}`}>
+        <div className="text-xs md:text-sm text-gray-500 dark:text-gray-400 uppercase">
           {daySelected.format('dddd')}
         </div>
-        <div className="flex items-baseline gap-2 mt-2">
+        <div className="flex items-baseline gap-2 mt-1 md:mt-2">
           <div
-            className={`text-5xl font-bold ${
+            className={`text-3xl md:text-5xl font-bold ${
               isToday
-                ? 'bg-blue-600 text-white rounded-full w-20 h-20 flex items-center justify-center'
+                ? 'bg-blue-600 text-white rounded-full w-14 h-14 md:w-20 md:h-20 flex items-center justify-center'
                 : 'text-gray-700 dark:text-gray-200'
             }`}
           >
             {daySelected.format('DD')}
           </div>
-          <div className="text-2xl text-gray-600 dark:text-gray-300">
+          <div className="text-lg md:text-2xl text-gray-600 dark:text-gray-300">
             {daySelected.format('MMMM YYYY')}
           </div>
         </div>
@@ -316,9 +316,14 @@ export const DayView = () => {
       <div className="flex-1 overflow-y-auto scrollbar-custom">
         <div className="relative">
           {hours.map((hour) => (
-            <div key={hour} className="flex border-b dark:border-gray-700 min-h-20">
-              <div className="w-24 p-4 border-r dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 text-right shrink-0">
-                {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
+            <div key={hour} className="flex border-b dark:border-gray-700 min-h-16 md:min-h-20">
+              <div className="w-16 md:w-24 p-2 md:p-4 border-r dark:border-gray-700 text-[10px] md:text-sm text-gray-500 dark:text-gray-400 text-right shrink-0">
+                <span className="hidden md:inline">
+                  {hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour - 12}:00 PM`}
+                </span>
+                <span className="md:hidden">
+                  {hour === 0 ? '12a' : hour < 12 ? `${hour}a` : hour === 12 ? '12p' : `${hour - 12}p`}
+                </span>
               </div>
               <div
                 className="flex-1 relative"

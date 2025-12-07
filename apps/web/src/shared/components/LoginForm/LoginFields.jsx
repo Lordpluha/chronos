@@ -44,9 +44,9 @@ export function LoginFields({ register, errors, isLoading, showPassword, setShow
             onClick={() => setShowPassword((v) => !v)}
           >
             {showPassword ? (
-              <img src="/eye-icon-close.svg" alt="" />
+              <img src="/eye-icon-close.svg" alt="" className="dark:invert" />
             ) : (
-              <img src="/eye-icon.svg" alt="" />
+              <img src="/eye-icon.svg" alt="" className="dark:invert" />
             )}
           </button>
         </div>

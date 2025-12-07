@@ -179,7 +179,15 @@ class EventsService {
     eventsAsAttendee = await Event.find(attendeeQuery)
       .populate('creator organizer calendar')
       .populate('attendees.user')
-      .sort({ start: 1 })    // Объединяем оба списка
+      .sort({ start: 1 })
+
+    console.log(`📊 getUserEvents for user ${userId}:`, {
+      calendarsCount: calendarIds.length,
+      eventsFromCalendars: eventsFromCalendars.length,
+      eventsAsAttendee: eventsAsAttendee.length
+    });
+
+    // Объединяем оба списка
     let events = [...eventsFromCalendars, ...eventsAsAttendee]
 
     // Удаляем дубликаты по _id
@@ -360,6 +368,7 @@ class EventsService {
       )
 
       eventObj.attendees = attendeesWithRoles
+      console.log(`👥 getEventById (${eventId}): returning ${attendeesWithRoles.length} attendees with roles`);
     }
 
     return eventObj
@@ -400,10 +409,8 @@ class EventsService {
 
       if (calendarAccess) {
         hasCalendarWriteAccess = true
-      } else if (typeof event.calendar !== 'string') {
-        // Fallback на старую систему shared_with
-        hasCalendarWriteAccess = event.calendar.hasAccess(userId, 'write')
       }
+      // Используем только новую систему Access для единообразия
     }
 
     // 3. Проверяем, является ли пользователь организатором
@@ -558,10 +565,9 @@ class EventsService {
 
       if (calendarAccess) {
         hasCalendarDeleteAccess = true
-      } else if (typeof event.calendar !== 'string') {
-        // Fallback на старую систему shared_with
-        hasCalendarDeleteAccess = event.calendar.hasAccess(userId, 'write')
       }
+      // УДАЛИЛИ FALLBACK НА СТАРУЮ СИСТЕМУ - теперь только через Access записи!
+      // Это гарантирует, что admin не сможет удалять события, только owner
     }
 
     // 3. Проверяем, является ли пользователь организатором
@@ -593,6 +599,8 @@ class EventsService {
    * Добавить участника к событию (через Access модель)
    */
   async addAttendee(eventId, userId, attendeeData) {
+    console.log('🎯 addAttendee called:', { eventId, userId, attendeeData });
+
     const event = await Event.findById(eventId).populate('calendar').populate('attendees.user')
 
     if (!event) {
@@ -610,6 +618,7 @@ class EventsService {
 
     // Если ничего не передано - добавляем текущего пользователя (self-subscribe)
     if (!user_id && !email) {
+      console.log('📝 Self-subscribe mode: adding current user');
       targetUserId = userId
       const currentUser = await User.findById(userId)
       if (currentUser) {
@@ -818,6 +827,8 @@ class EventsService {
    * Обновить статус участника
    */
   async updateAttendeeStatus(eventId, userId, status) {
+    console.log('🔄 updateAttendeeStatus called:', { eventId, userId, status });
+
     const event = await Event.findById(eventId).populate('attendees.user')
 
     if (!event) {
@@ -825,6 +836,14 @@ class EventsService {
       error.status = 404
       throw error
     }
+
+    console.log('📋 Current attendees:', event.attendees.map(a => ({
+      _id: a._id,
+      user: a.user?._id || a.user,
+      email: a.email,
+      status: a.status,
+      pending_role: a.pending_role
+    })));
 
     // Находим участника
     const attendee = event.attendees.find(a => {
@@ -838,16 +857,27 @@ class EventsService {
     })
 
     if (!attendee) {
+      console.error('❌ Attendee not found for userId:', userId);
       const error = new Error('You are not an attendee of this event')
       error.status = 404
       throw error
     }
 
+    console.log('✅ Found attendee:', {
+      _id: attendee._id,
+      current_status: attendee.status,
+      pending_role: attendee.pending_role,
+      new_status: status
+    });
+
     // Обновляем статус
     event.updateAttendeeStatus(userId, status, true)
+    console.log('📝 Attendee status updated to:', status);
 
     // Если статус = accepted и есть pending_role, создаем Access записи
     if (status === 'accepted' && attendee.pending_role) {
+      console.log('🎯 Creating access records for accepted invitation');
+
       const accessRights = {
         owner: ['read', 'update', 'delete', 'share'],
         admin: ['read', 'update', 'share'],
@@ -863,7 +893,7 @@ class EventsService {
         entity_id: event._id
       })
 
-      // Создаем новые Access записи
+      // Создаем новые Access записи для события
       for (const type of typesToGrant) {
         const accessName = `event.${type}.${new mongoose.Types.ObjectId().toString()}`
         await Access.grantAccess(
@@ -873,6 +903,36 @@ class EventsService {
           event._id,
           accessName
         )
+        console.log(`✅ Granted ${type} access to event for user ${userId}`);
+      }
+
+      // ВАЖНО: Даем доступ к календарю (read-only) чтобы событие могло загрузиться из API
+      // НО НЕ добавляем календарь в список пользователя (не шарим весь календарь!)
+      if (event.calendar) {
+        const calendarId = typeof event.calendar === 'object' ? event.calendar._id : event.calendar;
+
+        // Проверяем, нет ли уже доступа к календарю
+        const hasCalendarAccess = await Access.findOne({
+          user: userId,
+          controls: 'calendar',
+          entity_id: calendarId,
+          type: 'read'
+        });
+
+        if (!hasCalendarAccess) {
+          console.log(`📅 Granting read-only access to calendar ${calendarId} for user ${userId} (for event loading)`);
+          const calendarAccessName = `calendar.read.${calendarId.toString()}`;
+          await Access.grantAccess(
+            userId,
+            'calendar',
+            'read',
+            calendarId,
+            calendarAccessName
+          );
+          console.log(`✅ Calendar access granted (read-only, not added to user's calendar list)`);
+        } else {
+          console.log(`ℹ️ User already has access to calendar`);
+        }
       }
 
       // Очищаем pending_role после создания Access
@@ -880,6 +940,15 @@ class EventsService {
     }
 
     await event.save()
+    console.log('💾 Event saved with updated attendee status');
+
+    // Log final attendee state
+    console.log('👥 Final attendees state:', event.attendees.map(a => ({
+      user: a.user?._id || a.user,
+      email: a.email,
+      status: a.status,
+      pending_role: a.pending_role
+    })));
 
     return event
   }

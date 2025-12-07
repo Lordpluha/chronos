@@ -32,7 +32,6 @@ app.use(
 // @ts-expect-error
 app.use(cookieParser(AppConfig.JWT_SECRET))
 
-// Парсеры тела
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 

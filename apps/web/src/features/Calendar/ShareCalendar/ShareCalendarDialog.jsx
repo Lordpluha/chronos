@@ -35,6 +35,7 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
         const email = userObj?.email || share.email || 'Unknown User';
         const name = userObj?.name || email.split('@')[0];
         const userId = userObj?._id || share.user;
+        const userAvatar = userObj?.avatar; // URL аватара если есть
 
         // Маппинг старых значений на новые
         let mappedPermission = share.permission || 'viewer';
@@ -47,7 +48,8 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
           email: email,
           name: name,
           permission: mappedPermission,
-          avatar: email !== 'Unknown User' ? email[0]?.toUpperCase() : '?',
+          avatarUrl: userAvatar, // URL аватара
+          avatarLetter: email !== 'Unknown User' ? email[0]?.toUpperCase() : '?', // Первая буква для fallback
           userId: userId,
         };
       }).filter(share => share.email !== 'Unknown User'); // Фильтруем невалидные записи
@@ -78,8 +80,10 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
       const newShare = {
         id: Date.now(),
         email,
+        name: email.split('@')[0],
         permission,
-        avatar: email[0].toUpperCase(),
+        avatarUrl: null, // Новый участник ещё не имеет аватара
+        avatarLetter: email[0].toUpperCase(),
       };
 
       setSharedWith([...sharedWith, newShare]);
@@ -192,8 +196,16 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
               {calendar?.creator && (
                 <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium">
-                      {calendar.creator?.email?.[0]?.toUpperCase() || 'C'}
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                      {calendar.creator?.avatar ? (
+                        <img
+                          src={calendar.creator.avatar}
+                          alt={calendar.creator?.email || 'Creator'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        calendar.creator?.email?.[0]?.toUpperCase() || 'C'
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -215,8 +227,16 @@ export function ShareCalendarDialog({ open, onOpenChange, calendar }) {
                   className="flex items-center justify-between p-3 rounded-md border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium">
-                      {user.avatar}
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
+                      {user.avatarUrl ? (
+                        <img
+                          src={user.avatarUrl}
+                          alt={user.name || user.email}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.avatarLetter
+                      )}
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium">{user.name || user.email}</p>

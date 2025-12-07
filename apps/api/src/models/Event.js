@@ -305,14 +305,11 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       async findWithRecurrence(calendarId, startDate, endDate) {
-        // Находим базовые события (не экземпляры повторений)
         const events = await this.find({
           calendar: calendarId,
           recurrence_id: null,
           $or: [
-            // Обычные события в диапазоне
             { is_recurring: false, start: { $gte: startDate, $lte: endDate } },
-            // Повторяющиеся события, которые начались до конца периода
             { is_recurring: true, start: { $lte: endDate } },
           ],
         }).populate('creator organizer calendar')
@@ -327,7 +324,6 @@ const eventSchema = new mongoose.Schema(
       hasAccess(userId) {
         const userIdStr = userId.toString()
 
-        // Безопасное получение ID создателя и организатора
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
         const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
 
@@ -445,14 +441,12 @@ const eventSchema = new mongoose.Schema(
             occurrenceCount++
           }
 
-          // Увеличиваем дату в зависимости от частоты
           switch (frequency) {
             case 'daily':
               current.setDate(current.getDate() + interval)
               break
             case 'weekly':
               if (byWeekday && byWeekday.length > 0) {
-                // Находим следующий день недели из списка
                 let found = false
                 for (let i = 1; i <= 7; i++) {
                   const nextDay = new Date(current)
@@ -484,21 +478,18 @@ const eventSchema = new mongoose.Schema(
               break
           }
 
-          // Защита от бесконечного цикла
           if (occurrenceCount > maxOccurrences) break
         }
 
         return occurrences
       },
       /**
-       * Проверяет, является ли это мастер-событие (базовое повторяющееся)
        * @returns {boolean}
        */
       isMasterEvent() {
         return this.is_recurring && !this.recurrence_id
       },
       /**
-       * Проверяет, является ли это экземпляр повторяющегося события
        * @returns {boolean}
        */
       isRecurrenceInstance() {

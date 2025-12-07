@@ -208,12 +208,12 @@ class CalendarsService {
     }
 
     // Создаем Access записи на основе permission
-    // viewer -> read
-    // admin -> read, update, delete, share
-    // owner -> read, update, delete, share (аналогично admin, но семантически выше)
+    // viewer -> read (только просмотр)
+    // admin -> read, update, share (редактирование и приглашение, БЕЗ удаления)
+    // owner -> read, update, delete, share (полный контроль)
     const accessTypes = {
       viewer: ['read'],
-      admin: ['read', 'update', 'delete', 'share'],
+      admin: ['read', 'update', 'share'],
       owner: ['read', 'update', 'delete', 'share'],
       // Поддержка старых названий для обратной совместимости
       read: ['read'],
@@ -442,7 +442,7 @@ class CalendarsService {
     // Создаем новые Access записи на основе permission
     const accessTypes = {
       viewer: ['read'],
-      admin: ['read', 'update', 'delete', 'share'],
+      admin: ['read', 'update', 'share'],
       owner: ['read', 'update', 'delete', 'share'],
       // Поддержка старых названий для обратной совместимости
       read: ['read'],
@@ -520,6 +520,17 @@ class CalendarsService {
     const existingAccess = await Access.hasAccess(targetUser._id, 'calendar', 'read', calendar._id);
     if (existingAccess) {
       console.log('✅ User already has access to this calendar');
+
+      // ВАЖНО: Проверяем добавлен ли календарь в список пользователя
+      if (!targetUser.calendars.includes(calendar._id)) {
+        console.log('📅 Adding calendar to user\'s list');
+        targetUser.addCalendar(calendar._id);
+        await targetUser.save();
+        console.log(`✅ Calendar added to user ${targetUser.email}'s list`);
+      } else {
+        console.log('ℹ️ Calendar already in user\'s list');
+      }
+
       return calendar;
     }
 

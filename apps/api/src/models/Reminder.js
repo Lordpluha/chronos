@@ -206,16 +206,13 @@ const reminderSchema = new mongoose.Schema(
       hasAccess(userId, requiredPermission = 'read') {
         const userIdStr = userId.toString()
 
-        // Безопасное получение ID создателя и организатора
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
         const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
 
-        // Создатель и организатор имеют полный доступ
         if (creatorId === userIdStr || organizerId === userIdStr) {
           return true
         }
 
-        // Проверяем shared_with
         const sharedAccess = this.shared_with.find((share) => {
           const shareUser = share.user
           const shareUserId = (shareUser && typeof shareUser === 'object' && '_id' in shareUser)
@@ -226,12 +223,11 @@ const reminderSchema = new mongoose.Schema(
 
         if (!sharedAccess) return false
 
-        // Проверяем уровень доступа
         if (requiredPermission === 'write') {
           return sharedAccess.permission === 'write'
         }
 
-        return true // read доступ есть
+        return true
       },
       shareWith(userId, permission = 'read') {
         const userIdStr = userId.toString()
@@ -280,17 +276,14 @@ const reminderSchema = new mongoose.Schema(
   },
 )
 
-// Virtual for reminder ID (alias for _id)
 reminderSchema.virtual('id').get(function () {
   return this._id.toHexString()
 })
 
-// Virtual to check if reminder is overdue
 reminderSchema.virtual('isOverdue').get(function () {
   return this.start < new Date()
 })
 
-// Virtual to check if reminder is upcoming (within next 24 hours)
 reminderSchema.virtual('isUpcoming').get(function () {
   const now = new Date()
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)

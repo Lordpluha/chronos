@@ -1,5 +1,6 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarHeader } from "../components/CalendarHeader";
 import { Sidebar } from "../components/Sidebar";
 import { Month } from "../components/Month";
@@ -15,198 +16,227 @@ import { EventModal } from "../components/EventModal";
 export function CalendarPage() {
   const { monthIndex, showEventModal, viewMode, isLoadingEvents, eventsError, setShowEventModal, setSelectedEvent, savedEvents, refetchCalendars, refetchEvents } = useContext(CalendarContext);
   const { settings } = useCalendarSettings();
+  const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(getMonth(monthIndex, settings.weekStartsOn));
   const [searchParams, setSearchParams] = useSearchParams();
   const [isRefetchingFromUrl, setIsRefetchingFromUrl] = useState(false);
   const [processedEventId, setProcessedEventId] = useState(null); // Отслеживаем обработанные события
   const [processedCalendarId, setProcessedCalendarId] = useState(null); // Отслеживаем обработанные календари
 
+  // Защита от дублирования запросов
+  const processingCalendarRef = useRef(false);
+  const processingEventRef = useRef(false);
+
+  // Логируем URL параметры при каждом рендере
+  console.log('🌐 CalendarPage render, URL params:', {
+    event: searchParams.get('event'),
+    calendar: searchParams.get('calendar'),
+    action: searchParams.get('action'),
+    fullURL: window.location.href
+  });
+
   useEffect(() => {
     setCurrentMonth(getMonth(monthIndex, settings.weekStartsOn));
   }, [monthIndex, settings.weekStartsOn]);
 
-  // Открываем событие из URL параметра ?event=ID
+  // Открываем событие из URL параметра ?event=ID или принимаем приглашение ?event=ID&action=accept
   useEffect(() => {
     const eventId = searchParams.get('event');
-    const calendarId = searchParams.get('cal');
-    const action = searchParams.get('action'); // Проверяем action=accept
+    const action = searchParams.get('action');
 
-    // Пропускаем если уже обрабатываем
-    if (isRefetchingFromUrl) {
+    console.log('🔍 CalendarPage useEffect (event):', { eventId, action, processedEventId, isRefetchingFromUrl });
+
+    // Пропускаем если уже обрабатываем или нет eventId
+    if (!eventId || isRefetchingFromUrl) {
       return;
     }
 
-    // Если есть eventId и мы еще не начали загрузку
-    if (eventId && !processedEventId) {
-      setIsRefetchingFromUrl(true);
-      setProcessedEventId(eventId); // Помечаем как обрабатываемый
-      Promise.all([refetchCalendars(), refetchEvents()]).then(() => {
-        setIsRefetchingFromUrl(false);
-        // НЕ сбрасываем processedEventId - пусть следующий useEffect обработает событие
-      }).catch(error => {
-        console.error('❌ Failed to refetch data:', error);
-        setIsRefetchingFromUrl(false);
-        setProcessedEventId(null);
-      });
+    // Если eventId изменился - сбрасываем processedEventId
+    if (processedEventId && eventId !== processedEventId) {
+      console.log('🔄 Resetting processedEventId because eventId changed');
+      setProcessedEventId(null);
       return;
     }
 
-    // Если уже загрузили данные и есть eventId
-    if (eventId && processedEventId === eventId && savedEvents && savedEvents.length > 0) {
-      const event = savedEvents.find(e => e.id === eventId || e._id === eventId);
-      if (event) {
-        // НЕ открываем модалку, просто очищаем URL
-        // Событие уже в календаре благодаря filteredEvents
-        searchParams.delete('event');
-        searchParams.delete('action');
-        setSearchParams(searchParams, { replace: true });
-        setProcessedEventId(null); // Сбрасываем после успешной обработки
-      } else {
-        // Попробуем загрузить событие напрямую через API
-        import('@entities/Event/api/EventApi').then(({ EventApi }) => {
-          EventApi.getById(eventId)
-            .then(async (eventData) => {
-              // Если есть action=accept, принимаем приглашение
-              if (action === 'accept') {
-                try {
-                  const updatedEvent = await EventApi.updateMyStatus(eventId, 'accepted');
+    // Если уже обработали этот event - ничего не делаем
+    if (processedEventId === eventId) {
+      console.log('ℹ️ Event already processed, skipping');
+      return;
+    }
 
-                  // Перезагружаем события чтобы получить обновленный список
-                  await refetchEvents();
+    // Помечаем как обрабатываемый
+    setProcessedEventId(eventId);
 
-                  // Даем время React Query обновить кэш
-                  await new Promise(resolve => setTimeout(resolve, 1000));
+    // Обрабатываем публичную ссылку события (с action=accept или без)
+    // Для публичных ссылок автоматически добавляем пользователя как участника
+    console.log('🎯 Processing event public link (auto-subscribing)');
 
-                  // Очищаем query параметры
-                  searchParams.delete('event');
-                  searchParams.delete('action');
-                  setSearchParams(searchParams, { replace: true });
-                  setProcessedEventId(null);
+    import('@entities/Event/api/EventApi').then(({ EventApi }) => {
+        // Сначала загружаем событие
+        EventApi.getById(eventId)
+          .then(async (eventData) => {
+            console.log('✅ Event loaded:', eventData.title);
 
-                  // Показываем уведомление
-                  import('sonner').then(({ toast }) => {
-                    toast.success(`Event "${eventData.title}" has been added to your calendar`);
-                  });
-                } catch (acceptError) {
-                  console.error('❌ Failed to accept invitation:', acceptError);
-                  import('sonner').then(({ toast }) => {
-                    toast.error('Failed to accept invitation');
-                  });
-                  searchParams.delete('event');
-                  searchParams.delete('action');
-                  setSearchParams(searchParams, { replace: true });
-                  setProcessedEventId(null);
-                }
-              } else {
-                // Просто показываем что событие доступно
-                searchParams.delete('event');
-                setSearchParams(searchParams, { replace: true });
-                setProcessedEventId(null);
+            try {
+              // 1. Добавляем себя как участника (self-subscribe)
+              console.log('📝 Step 1: Adding self as attendee');
+              try {
+                await EventApi.addAttendee(eventId, { role: 'viewer' });
+                console.log('✅ Self added as attendee');
+              } catch (addError) {
+                console.log('ℹ️ Already an attendee:', addError.response?.data?.message || addError.message);
               }
-            })
-            .catch(error => {
-              console.error('❌ Failed to load event from API:', error);
-              // Показываем уведомление пользователю
-              import('sonner').then(({ toast }) => {
-                toast.error('Event not found or you don\'t have access to it');
-              });
-              // Очищаем query параметр
+
+              // 2. Принимаем приглашение
+              console.log('📝 Step 2: Accepting invitation');
+              await EventApi.updateMyStatus(eventId, 'accepted');
+              console.log('✅ Invitation accepted');
+
+              // 3. Инвалидируем кеш и перезагружаем данные
+              console.log('🔄 Step 3: Refreshing data');
+              await queryClient.invalidateQueries({ queryKey: ['events'] });
+              await queryClient.invalidateQueries({ queryKey: ['calendars'] });
+              await Promise.all([refetchEvents(), refetchCalendars()]);
+
+              // 4. Даем время на обновление
+              await new Promise(resolve => setTimeout(resolve, 2000));
+
+              // 5. Очищаем URL
               searchParams.delete('event');
               searchParams.delete('action');
               setSearchParams(searchParams, { replace: true });
-              setProcessedEventId(null); // Сбрасываем после обработки
-            });
-        });
-      }
-    }
+              setProcessedEventId(null);
 
-    if (calendarId && !processedEventId && !processedCalendarId) {
-      setProcessedCalendarId(calendarId); // Помечаем как обрабатываемый
-
-      // Попытка загрузить календарь и подписаться на него
-      import('@entities/Calendar/api/CalendarApi').then(({ CalendarApi }) => {
-        CalendarApi.getById(calendarId)
-          .then(async (calendarData) => {
-            // Автоматически подписываемся на календарь
-            try {
-              await CalendarApi.subscribe(calendarId, {
-                permission: 'read'  // Только на чтение
-              });
-
-              // Перезагружаем календари чтобы получить обновленный список
-              await refetchCalendars();
-
-              // Очищаем query параметр
-              searchParams.delete('cal');
-              setSearchParams(searchParams, { replace: true });
-              setProcessedCalendarId(null); // Сбрасываем после успешной обработки
-
-              // Показываем уведомление
+              console.log('🎉 Event invitation accepted successfully');
               import('sonner').then(({ toast }) => {
-                toast.success(`Calendar "${calendarData.title}" has been added to your calendars`);
+                toast.success(`Event "${eventData.title}" has been added to your calendar`);
               });
-            } catch (subscribeError) {
-              console.error('❌ Failed to subscribe to calendar:', subscribeError);
-              // Если не удалось подписаться - показываем уведомление
+            } catch (error) {
+              console.error('❌ Failed to accept invitation:', error);
               import('sonner').then(({ toast }) => {
-                toast.info(`Calendar "${calendarData.title}" is view-only. You can see it but it's not added to your list.`);
+                toast.error('Failed to accept invitation');
               });
-              searchParams.delete('cal');
+              searchParams.delete('event');
+              searchParams.delete('action');
               setSearchParams(searchParams, { replace: true });
-              setProcessedCalendarId(null);
+              setProcessedEventId(null);
             }
           })
           .catch(error => {
-            console.error('❌ Failed to load calendar from API:', error);
-            // Показываем уведомление пользователю
+            console.error('❌ Failed to load event:', error);
             import('sonner').then(({ toast }) => {
-              toast.error('Calendar not found or you don\'t have access to it');
+              toast.error('Event not found or you don\'t have access to it');
             });
-            // Очищаем query параметр
-            searchParams.delete('cal');
+            searchParams.delete('event');
+            searchParams.delete('action');
             setSearchParams(searchParams, { replace: true });
-            setProcessedCalendarId(null);
+            setProcessedEventId(null);
           });
       });
+  }, [searchParams, setSearchParams, processedEventId, isRefetchingFromUrl, queryClient, refetchEvents, refetchCalendars]);
+
+  // Обработка приглашений в календарь: ?calendar=ID&action=accept ИЛИ ?cal=ID
+  useEffect(() => {
+    const calendarInviteId = searchParams.get('calendar');
+    const calendarId = searchParams.get('cal');
+    const action = searchParams.get('action');
+    const targetCalendarId = calendarInviteId || calendarId;
+
+    console.log('📅 CalendarPage useEffect (calendar):', { targetCalendarId, action, processedCalendarId, isProcessing: processingCalendarRef.current });
+
+    // Пропускаем если нет calendar ID
+    if (!targetCalendarId) {
+      return;
     }
 
-    // Обработка приглашения в календарь: ?calendar=ID&action=accept
-    const calendarInviteId = searchParams.get('calendar');
-    if (calendarInviteId && action === 'accept' && !processedCalendarId) {
-      setProcessedCalendarId(calendarInviteId);
+    // ВАЖНО: Проверяем ref для защиты от дублирования
+    if (processingCalendarRef.current) {
+      console.log('⚠️ Calendar processing already in progress (ref check), skipping');
+      return;
+    }
 
-      import('@entities/Calendar/api/CalendarApi').then(({ CalendarApi }) => {
-        CalendarApi.acceptInvitation(calendarInviteId)
-          .then(async (calendarData) => {
-            // Перезагружаем календари чтобы получить обновленный список
+    // Если уже обработали этот календарь - пропускаем
+    if (processedCalendarId === targetCalendarId) {
+      console.log('ℹ️ Calendar already processed, skipping');
+      return;
+    }
+
+    // Если есть event в URL - пропускаем (обработка событий имеет приоритет)
+    if (searchParams.get('event')) {
+      console.log('ℹ️ Event processing in progress, skipping calendar');
+      return;
+    }
+
+    console.log('📅 Processing calendar invitation:', { targetCalendarId, action, isInvite: !!calendarInviteId });
+
+    // Устанавливаем флаги обработки
+    setProcessedCalendarId(targetCalendarId);
+    processingCalendarRef.current = true;
+
+    import('@entities/Calendar/api/CalendarApi').then(({ CalendarApi }) => {
+      CalendarApi.getById(targetCalendarId)
+        .then(async (calendarData) => {
+          // Автоматически подписываемся на календарь
+          try {
+            console.log('📝 Subscribing to calendar...');
+            await CalendarApi.subscribe(targetCalendarId, {
+              permission: 'read'  // Только на чтение
+            });
+
+            // ВАЖНО: Инвалидируем кеш календарей
+            console.log('🔄 Invalidating calendars cache...');
+            await queryClient.invalidateQueries({ queryKey: ['calendars'] });
+
+            // Перезагружаем календари
             await refetchCalendars();
 
+            // Даем время на обновление
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
             // Очищаем query параметры
+            searchParams.delete('cal');
             searchParams.delete('calendar');
             searchParams.delete('action');
             setSearchParams(searchParams, { replace: true });
             setProcessedCalendarId(null);
+            processingCalendarRef.current = false; // Сбрасываем флаг
+
+            console.log('✅ Calendar subscription completed');
 
             // Показываем уведомление
             import('sonner').then(({ toast }) => {
-              toast.success(`Calendar invitation accepted! "${calendarData.calendar?.title || 'Calendar'}" has been added to your calendars`);
+              toast.success(`Calendar "${calendarData.title}" has been added to your calendars`);
             });
-          })
-          .catch(error => {
-            console.error('❌ Failed to accept calendar invitation:', error);
-            // Показываем уведомление пользователю
+          } catch (subscribeError) {
+            console.error('❌ Failed to subscribe to calendar:', subscribeError);
+            // Если не удалось подписаться - показываем уведомление
             import('sonner').then(({ toast }) => {
-              toast.error(error.response?.data?.message || 'Failed to accept calendar invitation');
+              toast.info(`Calendar "${calendarData.title}" is view-only. You can see it but it's not added to your list.`);
             });
-            // Очищаем query параметры
+            searchParams.delete('cal');
             searchParams.delete('calendar');
             searchParams.delete('action');
             setSearchParams(searchParams, { replace: true });
             setProcessedCalendarId(null);
+            processingCalendarRef.current = false; // Сбрасываем флаг
+          }
+        })
+        .catch(error => {
+          console.error('❌ Failed to load calendar from API:', error);
+          // Показываем уведомление пользователю
+          import('sonner').then(({ toast }) => {
+            toast.error('Calendar not found or you don\'t have access to it');
           });
-      });
-    }
-  }, [searchParams, setSelectedEvent, setShowEventModal, setSearchParams, isRefetchingFromUrl, processedEventId, processedCalendarId]);
+          // Очищаем query параметры
+          searchParams.delete('cal');
+          searchParams.delete('calendar');
+          searchParams.delete('action');
+          setSearchParams(searchParams, { replace: true });
+          setProcessedCalendarId(null);
+          processingCalendarRef.current = false; // Сбрасываем флаг
+        });
+    });
+  }, [searchParams, setSearchParams, processedCalendarId, queryClient, refetchCalendars]);
   // НЕ включаем refetchCalendars, refetchEvents и savedEvents в зависимости!
 
   if (isLoadingEvents || isRefetchingFromUrl) {

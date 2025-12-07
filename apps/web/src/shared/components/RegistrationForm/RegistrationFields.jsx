@@ -61,9 +61,9 @@ export function RegistrationFields({ register, errors, isLoading }) {
             onClick={() => setShowPassword((v) => !v)}
           >
             {showPassword ? (
-              <img src="/eye-icon-close.svg" alt="" />
+              <img src="/eye-icon-close.svg" alt="" className="dark:invert" />
             ) : (
-              <img src="/eye-icon.svg" alt="" />
+              <img src="/eye-icon.svg" alt="" className="dark:invert" />
             )}
           </button>
         </div>
@@ -88,9 +88,9 @@ export function RegistrationFields({ register, errors, isLoading }) {
             onClick={() => setShowConfirmPassword((v) => !v)}
           >
             {showConfirmPassword ? (
-              <img src="/eye-icon-close.svg" alt="" />
+              <img src="/eye-icon-close.svg" alt="" className="dark:invert" />
             ) : (
-              <img src="/eye-icon.svg" alt="" />
+              <img src="/eye-icon.svg" alt="" className="dark:invert" />
             )}
           </button>
         </div>

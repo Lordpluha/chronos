@@ -6,7 +6,6 @@ let db = null
 let client = null
 let isConnected = false
 
-// MongoDB native driver connection
 export async function connectMongoDB() {
   try {
     if (client?.topology?.isConnected()) {
@@ -26,23 +25,19 @@ export async function connectMongoDB() {
   }
 }
 
-// Mongoose connection optimized for serverless
 export async function connectMongoose() {
   try {
-    // Reuse existing connection if available
     if (isConnected && mongoose.connection.readyState === 1) {
 
       return mongoose.connection
     }
 
-    // Close any existing connections
     if (mongoose.connection.readyState !== 0) {
       await mongoose.connection.close()
     }
 
     await mongoose.connect(AppConfig.MONGO_URI, {
       ...AppConfig.MONGO_OPTIONS,
-      // Serverless specific optimizations
       connectTimeoutMS: 10000,
       heartbeatFrequencyMS: 30000,
       authSource: 'admin',
@@ -74,7 +69,6 @@ export async function connectMongoose() {
   }
 }
 
-// Get database instance
 export function getDatabase() {
   if (!db) {
     throw new Error('Database not connected. Call connectMongoDB() first.')
@@ -82,7 +76,6 @@ export function getDatabase() {
   return db
 }
 
-// Close connections gracefully (important for serverless)
 export async function closeDatabaseConnections() {
   try {
     if (client) {
@@ -100,7 +93,6 @@ export async function closeDatabaseConnections() {
   }
 }
 
-// Serverless-friendly connection helper
 export async function ensureConnection() {
   if (!isConnected || mongoose.connection.readyState !== 1) {
 
@@ -109,7 +101,6 @@ export async function ensureConnection() {
   return mongoose.connection
 }
 
-// Graceful shutdown (less critical for serverless but good practice)
 if (AppConfig.env !== 'production') {
   process.on('SIGINT', async () => {
     await closeDatabaseConnections()

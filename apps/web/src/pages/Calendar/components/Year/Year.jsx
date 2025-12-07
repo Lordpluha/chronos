@@ -66,36 +66,36 @@ export const Year = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-custom p-6 bg-white dark:bg-gray-800">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{currentYear}</h2>
+    <div className="h-full overflow-y-auto scrollbar-custom p-3 md:p-6 bg-white dark:bg-gray-800">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 dark:text-gray-100">{currentYear}</h2>
       </div>
 
-      <div className="grid grid-cols-4 gap-6 pb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 pb-6">
         {months.map((month, monthIndex) => (
-          <div key={monthIndex} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
-            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 text-center">
+          <div key={monthIndex} className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 md:p-3 bg-white dark:bg-gray-800">
+            <h3 className="text-xs md:text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2 text-center">
               {month}
             </h3>
 
             {/* Days of week header */}
-            <div className="grid grid-cols-7 gap-1 mb-1">
+            <div className="grid grid-cols-7 gap-0.5 md:gap-1 mb-1">
               {getDayLabels().map((day, idx) => (
-                <div key={idx} className="text-xs text-gray-500 dark:text-gray-400 text-center font-medium">
+                <div key={idx} className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 text-center font-medium">
                   {day}
                 </div>
               ))}
             </div>
 
             {/* Days grid */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-0.5 md:gap-1">
               {getMonthDays(monthIndex).map((day, idx) => (
                 <button
                   key={idx}
                   onClick={() => handleDayClick(monthIndex, day)}
                   disabled={!day}
                   className={`
-                    text-xs h-6 flex items-center justify-center rounded
+                    text-[10px] md:text-xs h-5 md:h-6 w-5 md:w-6 flex items-center justify-center rounded
                     ${!day ? 'invisible' : ''}
                     ${isToday(monthIndex, day)
                       ? 'bg-blue-600 text-white font-bold'

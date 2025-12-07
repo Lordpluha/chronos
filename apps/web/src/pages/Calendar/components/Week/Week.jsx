@@ -309,22 +309,25 @@ export const Week = () => {
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800">
       {/* Week header with dates */}
-      <div className={`grid border-b dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10 pr-1.5 ${styles.weekGrid}`}>
-        <div className="p-2 border-r dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-right pr-3 flex items-center justify-end">Time</div>
+      <div className={`grid border-b dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10 pr-0.5 md:pr-1.5 ${styles.weekGrid}`}>
+        <div className="p-1 md:p-2 border-r dark:border-gray-700 text-[10px] md:text-xs text-gray-500 dark:text-gray-400 text-right pr-1 md:pr-3 flex items-center justify-end">
+          <span className="hidden md:inline">Time</span>
+          <span className="md:hidden">⏰</span>
+        </div>
         {weekDays.map((day, idx) => (
           <div
             key={idx}
-            className={`py-4 text-center border-r dark:border-gray-700 ${
+            className={`py-2 md:py-4 text-center border-r dark:border-gray-700 ${
               isToday(day) ? 'bg-blue-50 dark:bg-blue-900/30' : ''
             }`}
           >
-            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">
+            <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 uppercase">
               {day.format('ddd')}
             </div>
             <div
-              className={`text-2xl font-semibold mt-1 ${
+              className={`text-lg md:text-2xl font-semibold mt-0.5 md:mt-1 ${
                 isToday(day)
-                  ? 'bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center mx-auto'
+                  ? 'bg-blue-600 text-white rounded-full w-7 h-7 md:w-10 md:h-10 flex items-center justify-center mx-auto'
                   : 'text-gray-700 dark:text-gray-200'
               }`}
             >
@@ -338,9 +341,14 @@ export const Week = () => {
       <div className="flex-1 w-full overflow-y-auto scrollbar-custom">
         <div className="relative">
           {hours.map((hour) => (
-            <div key={hour} className={`grid border-b dark:border-gray-700 min-h-20 relative ${styles.weekGrid}`}>
-              <div className="p-2 border-r dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-right pr-3">
-                {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+            <div key={hour} className={`grid border-b dark:border-gray-700 min-h-16 md:min-h-20 relative ${styles.weekGrid}`}>
+              <div className="p-1 md:p-2 border-r dark:border-gray-700 text-[10px] md:text-xs text-gray-500 dark:text-gray-400 text-right pr-1 md:pr-3">
+                <span className="hidden md:inline">
+                  {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                </span>
+                <span className="md:hidden">
+                  {hour === 0 ? '12a' : hour < 12 ? `${hour}a` : hour === 12 ? '12p' : `${hour - 12}p`}
+                </span>
               </div>
               {weekDays.map((day, idx) => (
                 <div
@@ -356,7 +364,7 @@ export const Week = () => {
           ))}
 
           {/* Render events as absolutely positioned overlays */}
-          <div className={`absolute top-0 left-0 right-0 pointer-events-none grid ${styles.weekGrid}`} style={{ height: `${hours.length * 80}px` }}>
+          <div className={`absolute top-0 left-0 right-0 pointer-events-none grid ${styles.weekGrid}`} style={{ height: `${hours.length * (window.innerWidth < 768 ? 64 : 80)}px` }}>
             <div className="border-r" /> {/* Time column spacer */}
             {weekDays.map((day, dayIdx) => {
               const eventsForDay = getEventsForDay(day);
