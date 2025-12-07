@@ -11,7 +11,6 @@ class GoogleAuthService {
   }
 
   getCallbackUrl() {
-    // Возвращаем URL для callback в зависимости от окружения
     const baseUrl =
       process.env.NODE_ENV === 'production'
         ? `https://your-domain.com`
@@ -22,9 +21,8 @@ class GoogleAuthService {
   }
 
   /**
-   * Генерирует URL для авторизации через Google
-   * @param {string} state - Опциональный state параметр для защиты от CSRF
-   * @returns {string} URL для редиректа пользователя
+   * @param {string} state
+   * @returns {string}
    */
   getAuthUrl(state = null) {
     const scopes = [
@@ -47,7 +45,6 @@ class GoogleAuthService {
 
     console.log('🔗 Generated Auth URL:', authUrl)
 
-    // Извлекаем redirect_uri из URL для проверки
     const url = new URL(authUrl)
     const redirectUri = url.searchParams.get('redirect_uri')
     console.log('📍 Extracted redirect_uri:', redirectUri)
@@ -57,9 +54,8 @@ class GoogleAuthService {
   }
 
   /**
-   * Обменивает код авторизации на токены
-   * @param {string} code - Код авторизации от Google
-   * @returns {Promise<object>} Объект с токенами
+   * @param {string} code
+   * @returns {Promise<object>}
    */
   async getTokens(code) {
     try {
@@ -90,9 +86,8 @@ class GoogleAuthService {
   }
 
   /**
-   * Получает информацию о пользователе из Google
-   * @param {string} accessToken - Access token от Google
-   * @returns {Promise<object>} Информация о пользователе
+   * @param {string} accessToken
+   * @returns {Promise<object>}
    */
   async getUserInfo(accessToken) {
     try {
@@ -116,9 +111,8 @@ class GoogleAuthService {
   }
 
   /**
-   * Проверяет валидность токена
-   * @param {string} accessToken - Access token для проверки
-   * @returns {Promise<boolean>} true если токен валиден
+   * @param {string} accessToken
+   * @returns {Promise<boolean>}
    */
   async verifyToken(accessToken) {
     try {

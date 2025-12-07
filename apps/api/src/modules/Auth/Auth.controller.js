@@ -124,7 +124,6 @@ router.post(
   },
 )
 
-// Google OAuth routes
 router.get('/auth/google', async (req, res) => {
   try {
     console.log('🚀 Initiating Google OAuth...')
@@ -135,7 +134,7 @@ router.get('/auth/google', async (req, res) => {
     res.cookie('oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 10 * 60 * 1000, // 10 минут
+      maxAge: 10 * 60 * 1000,
       sameSite: 'lax',
     })
 
@@ -343,7 +342,7 @@ router.post(
   },
 )
 
-// Получить статус 2FA
+
 router.get('/auth/2fa/status', requireAccessToken, async (req, res) => {
   try {
     const userId = req.userId
