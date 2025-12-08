@@ -6,6 +6,7 @@ import { useAuth } from "./AuthContext";
 import { toast } from "sonner";
 import { useReminders, useReminderNotifications } from "@features/Reminders";
 import { useTasksWithDates } from "@features/Tasks/hooks";
+import { expandEvents } from "@shared/utils/recurrence";
 
 export const CalendarContextWrapper = (props) => {
   const { isAuthenticated, loading: authLoading, user } = useAuth();
@@ -121,6 +122,8 @@ export const CalendarContextWrapper = (props) => {
         attendees: event.attendees || [], // Добавляем attendees для ShareEventDialog
         creator: event.creator, // Добавляем информацию о создателе
         organizer: event.organizer, // Добавляем информацию об организаторе
+        recurrence: event.recurrence || null, // Добавляем recurrence
+        is_recurring: event.is_recurring || false, // Добавляем флаг повторяющегося события
       };
     });
 
@@ -182,8 +185,17 @@ export const CalendarContextWrapper = (props) => {
   }, [tasksData]);
 
   const allEvents = useMemo(() => {
-    return [...savedEvents, ...reminderEvents, ...taskEvents];
-  }, [savedEvents, reminderEvents, taskEvents]);
+    // Определяем диапазон для расширения повторяющихся событий
+    // Используем текущий просматриваемый месяц (monthIndex) +/- 6 месяцев
+    const currentMonth = dayjs().month(monthIndex);
+    const rangeStart = currentMonth.subtract(6, 'month').startOf('month').toDate();
+    const rangeEnd = currentMonth.add(6, 'month').endOf('month').toDate();
+
+    // Расширяем повторяющиеся события
+    const expandedEvents = expandEvents(savedEvents, rangeStart, rangeEnd);
+
+    return [...expandedEvents, ...reminderEvents, ...taskEvents];
+  }, [savedEvents, reminderEvents, taskEvents, monthIndex]);
 
   // Dispatch function to handle CRUD operations
   const dispatchCalEvent = ({ type, payload }) => {
@@ -199,45 +211,76 @@ export const CalendarContextWrapper = (props) => {
 
         // Transform local format to API format
         const dayDate = dayjs(payload.day);
-        const [startHours, startMinutes] = (payload.startTime || '09:00').split(':');
-        const [endHours, endMinutes] = (payload.endTime || '10:00').split(':');
+        const [startHours, startMinutes] = (payload.startTime || '09:00').split(':').map(Number);
+        const [endHours, endMinutes] = (payload.endTime || '10:00').split(':').map(Number);
 
-        const start = dayDate.hour(parseInt(startHours)).minute(parseInt(startMinutes)).second(0).toDate();
-        const end = dayDate.hour(parseInt(endHours)).minute(parseInt(endMinutes)).second(0).toDate();
+        const start = dayDate.hour(startHours).minute(startMinutes).second(0).toDate();
+        const end = dayDate.hour(endHours).minute(endMinutes).second(0).toDate();
 
-        createEventMutation.mutate({
+        // Валидация на клиенте
+        if (end <= start) {
+          console.error('Invalid time range:', { start, end, startTime: payload.startTime, endTime: payload.endTime });
+          toast.error('End time must be after start time');
+          return;
+        }
+
+        const eventData = {
           title: payload.title,
           description: payload.description || '',
           start: start.toISOString(),
           end: end.toISOString(),
           calendar_id: calendarId,
           time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        });
+        };
+
+        // Add recurrence if present
+        if (payload.recurrence) {
+          eventData.recurrence = payload.recurrence;
+        }
+
+        createEventMutation.mutate(eventData);
         break;
       }
       case "update": {
         const dayDate = dayjs(payload.day);
-        const [startHours, startMinutes] = (payload.startTime || '09:00').split(':');
-        const [endHours, endMinutes] = (payload.endTime || '10:00').split(':');
+        const [startHours, startMinutes] = (payload.startTime || '09:00').split(':').map(Number);
+        const [endHours, endMinutes] = (payload.endTime || '10:00').split(':').map(Number);
 
-        const start = dayDate.hour(parseInt(startHours)).minute(parseInt(startMinutes)).second(0).toDate();
-        const end = dayDate.hour(parseInt(endHours)).minute(parseInt(endMinutes)).second(0).toDate();
+        const start = dayDate.hour(startHours).minute(startMinutes).second(0).toDate();
+        const end = dayDate.hour(endHours).minute(endMinutes).second(0).toDate();
+
+        // Валидация на клиенте
+        if (end <= start) {
+          console.error('Invalid time range:', { start, end, startTime: payload.startTime, endTime: payload.endTime });
+          toast.error('End time must be after start time');
+          return;
+        }
+
+        const updateData = {
+          title: payload.title,
+          description: payload.description || '',
+          start: start.toISOString(),
+          end: end.toISOString(),
+          calendar_id: payload.calendarId,
+        };
+
+        // Add or remove recurrence
+        if (payload.recurrence !== undefined) {
+          updateData.recurrence = payload.recurrence;
+        }
 
         updateEventMutation.mutate({
           id: payload.id,
-          data: {
-            title: payload.title,
-            description: payload.description || '',
-            start: start.toISOString(),
-            end: end.toISOString(),
-            calendar_id: payload.calendarId,
-          },
+          data: updateData,
         });
         break;
       }
-      case "delete":
-        deleteEventMutation.mutate(payload.id);
+      case "delete": {
+        // Используем originalEventId если это экземпляр повторяющегося события
+        const eventId = payload.originalEventId || payload.id || payload._id;
+        deleteEventMutation.mutate(eventId);
         break;
+      }
       default:
         console.error("Unknown dispatch type:", type);
     }

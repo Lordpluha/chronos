@@ -65,7 +65,10 @@ export default function Day({ day }) {
               borderLeft: `2px md:border-l-4 solid ${evt.color || '#3b82f6'}`
             }}
           >
-            <div className="font-medium truncate">{evt.title}</div>
+            <div className="font-medium truncate flex items-center gap-1">
+              {evt.is_recurring && <span className="text-[10px]">🔁</span>}
+              {evt.title}
+            </div>
             {evt.startTime && (
               <div className="text-[9px] md:text-[10px] opacity-75 hidden md:block">
                 {evt.startTime}

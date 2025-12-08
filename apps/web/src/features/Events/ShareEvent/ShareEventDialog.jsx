@@ -261,7 +261,7 @@ export function ShareEventDialog({ open, onOpenChange, event }) {
                               return;
                             }
 
-                            const eventId = event?._id || event?.id;
+                            const eventId = event?.originalEventId || event?._id || event?.id;
                             console.log(`🔄 Updating role: eventId=${eventId}, attendeeId=${attendee.id}, newRole=${newRole}`);
                             setLoading(true);
                             try {

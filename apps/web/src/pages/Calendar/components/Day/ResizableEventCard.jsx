@@ -92,7 +92,10 @@ export const ResizableEventCard = ({ evt, day }) => {
       className="relative p-1 mr-3 text-gray-600 text-xs rounded mb-1 truncate cursor-pointer hover:opacity-80 transition-opacity group"
       style={cardStyle}
     >
-      <div className="font-medium">{evt.title}</div>
+      <div className="font-medium flex items-center gap-1">
+        {evt.is_recurring && <span className="text-[10px]">🔁</span>}
+        {evt.title}
+      </div>
       {evt.startTime && (
         <div className="text-[10px] opacity-75">
           {evt.startTime}

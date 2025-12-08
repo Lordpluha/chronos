@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@shared/ui/select";
+import { RecurrenceSelector } from "./RecurrenceSelector";
 
 export const EventModal = () => {
   const {
@@ -41,6 +42,7 @@ export const EventModal = () => {
   const [selectedCalendarId, setSelectedCalendarId] = useState(
     selectedEvent?.calendarId || defaultCalendarId
   );
+  const [recurrence, setRecurrence] = useState(selectedEvent?.recurrence || null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -49,7 +51,6 @@ export const EventModal = () => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const modalRef = useRef(null);
-
   useEffect(() => {
     if (selectedEvent) {
       setTitle(selectedEvent.title || "");
@@ -57,12 +58,14 @@ export const EventModal = () => {
       setStartTime(selectedEvent.startTime || "09:00");
       setEndTime(selectedEvent.endTime || "10:00");
       setSelectedCalendarId(selectedEvent.calendarId || defaultCalendarId);
+      setRecurrence(selectedEvent.recurrence || null);
     } else {
       setTitle("");
       setDescription("");
       setStartTime("09:00");
       setEndTime("10:00");
       setSelectedCalendarId(defaultCalendarId);
+      setRecurrence(null);
     }
     // Сброс позиции при открытии модалки
     setPosition({ x: 0, y: 0 });
@@ -127,6 +130,12 @@ export const EventModal = () => {
       return;
     }
 
+    // Проверка редактирования экземпляра повторяющегося события
+    if (selectedEvent?.isRecurringInstance) {
+      toast.error("Cannot edit individual occurrences. Edit the main event instead.");
+      return;
+    }
+
     const calendarEvent = {
       title,
       description,
@@ -134,7 +143,8 @@ export const EventModal = () => {
       day: daySelected.valueOf(),
       startTime,
       endTime,
-      id: selectedEvent?.id || selectedEvent?._id || Date.now(),
+      recurrence,
+      id: selectedEvent?.originalEventId || selectedEvent?.id || selectedEvent?._id || Date.now(),
     };
 
     // Check if this is an existing event (has valid id)
@@ -196,7 +206,8 @@ export const EventModal = () => {
   async function handleUpdateMyStatus(status) {
     if (!selectedEvent) return;
 
-    const eventId = selectedEvent._id || selectedEvent.id;
+    // Используем originalEventId для экземпляров повторяющихся событий
+    const eventId = selectedEvent.originalEventId || selectedEvent._id || selectedEvent.id;
     if (!eventId) {
       toast.error('Event ID is missing');
       return;
@@ -219,7 +230,21 @@ export const EventModal = () => {
   }
 
   function handleDelete() {
-    dispatchCalEvent({ type: "delete", payload: selectedEvent });
+    // Если это экземпляр повторяющегося события, предупреждаем пользователя
+    if (selectedEvent?.isRecurringInstance) {
+      const confirmDelete = window.confirm(
+        'This is a recurring event. Deleting it will remove ALL occurrences of this event. Do you want to continue?'
+      );
+      if (!confirmDelete) return;
+    }
+
+    // Используем originalEventId для экземпляров повторяющихся событий
+    const eventToDelete = {
+      ...selectedEvent,
+      id: selectedEvent?.originalEventId || selectedEvent?.id || selectedEvent?._id
+    };
+
+    dispatchCalEvent({ type: "delete", payload: eventToDelete });
     // Toast показывается в useDeleteEvent хуке
     setShowEventModal(false);
     setSelectedEvent(null);
@@ -328,7 +353,6 @@ export const EventModal = () => {
               disabled={isAttendee}
             />
           </div>
-
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -363,6 +387,28 @@ export const EventModal = () => {
               </div>
             )}
           </div>
+
+          {selectedEvent?.isRecurringInstance ? (
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-lg">🔁</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    Recurring Event Instance
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    This is one occurrence of a recurring event. To edit all occurrences, please edit the main event.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <RecurrenceSelector
+              value={recurrence}
+              onChange={setRecurrence}
+              disabled={isAttendee}
+            />
+          )}
 
           <DialogFooter className="pt-4">
             {selectedEvent && !isAttendee && (

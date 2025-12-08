@@ -89,6 +89,7 @@ export function CalendarPage() {
 
               // 2. Принимаем приглашение
               console.log('📝 Step 2: Accepting invitation');
+              // eventId from URL should already be clean (not an occurrence ID)
               await EventApi.updateMyStatus(eventId, 'accepted');
               console.log('✅ Invitation accepted');
 
