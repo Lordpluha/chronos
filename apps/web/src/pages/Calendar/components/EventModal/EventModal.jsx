@@ -52,7 +52,7 @@ export const EventModal = () => {
 
   useEffect(() => {
     if (selectedEvent) {
-      setTitle(selectedEvent.title);
+      setTitle(selectedEvent.title || "");
       setDescription(selectedEvent.description || "");
       setStartTime(selectedEvent.startTime || "09:00");
       setEndTime(selectedEvent.endTime || "10:00");
@@ -134,10 +134,13 @@ export const EventModal = () => {
       day: daySelected.valueOf(),
       startTime,
       endTime,
-      id: selectedEvent ? selectedEvent.id : Date.now(),
+      id: selectedEvent?.id || selectedEvent?._id || Date.now(),
     };
 
-    if (selectedEvent) {
+    // Check if this is an existing event (has valid id)
+    const isExistingEvent = selectedEvent && (selectedEvent.id || selectedEvent._id);
+
+    if (isExistingEvent) {
       dispatchCalEvent({ type: "update", payload: calendarEvent });
       // Toast показывается в useUpdateEvent хуке
     } else {
@@ -333,17 +336,7 @@ export const EventModal = () => {
             </Label>
             <Select value={selectedCalendarId} onValueChange={setSelectedCalendarId} disabled={isAttendee}>
               <SelectTrigger>
-                <div className="flex items-center gap-2">
-                  {selectedCalendarId && (
-                    <div
-                      className="w-3 h-3 rounded-sm shrink-0"
-                      style={{
-                        backgroundColor: calendars.find(c => c.id === selectedCalendarId)?.color
-                      }}
-                    />
-                  )}
-                  <SelectValue placeholder="Select calendar" />
-                </div>
+                <SelectValue placeholder="Select calendar" />
               </SelectTrigger>
               <SelectContent>
                 {calendars.map((calendar) => (

@@ -98,7 +98,8 @@ export const setup2FASchema = z.object({
   password: z
     .string()
     .min(1, 'Current password is required')
-    .max(128, 'Password must be less than 128 characters'),
+    .max(128, 'Password must be less than 128 characters')
+    .optional(),
 })
 
 export const enable2FASchema = z.object({
@@ -106,18 +107,25 @@ export const enable2FASchema = z.object({
   password: z
     .string()
     .min(1, 'Current password is required')
-    .max(128, 'Password must be less than 128 characters'),
+    .max(128, 'Password must be less than 128 characters')
+    .optional(),
 })
 
 export const disable2FASchema = z.object({
   password: z
     .string()
     .min(1, 'Current password is required')
-    .max(128, 'Password must be less than 128 characters'),
+    .max(128, 'Password must be less than 128 characters')
+    .optional(),
 })
 
 export const verify2FASchema = z.object({
   token: totpCodeSchema,
+})
+
+export const verifyOAuth2FASchema = z.object({
+  token: totpCodeSchema,
+  temp_token: z.string().min(1, 'Temporary token is required'),
 })
 
 export const loginWith2FASchema = z.object({

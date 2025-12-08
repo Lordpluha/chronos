@@ -1,8 +1,10 @@
 import { Landing } from '@pages/Landing'
 import { Login } from '@pages/Login'
+import { Login2FA } from '@pages/Login2FA'
 import { Registration } from '@pages/Registration'
 import { ForgotPassword } from '@pages/ForgotPassword'
 import { ResetPassword } from '@pages/ResetPassword'
+import { Verify2FA } from '@pages/Verify2FA'
 import { ProfilePage } from '@pages/Profile'
 import { AccountPage } from '@pages/AccountPage'
 import { CalendarPage } from '@pages/Calendar'
@@ -22,6 +24,14 @@ export const router = createBrowserRouter([
     element: (
       <GuestRoute>
         <Login />
+      </GuestRoute>
+    ),
+  },
+  {
+    path: '/auth/2fa',
+    element: (
+      <GuestRoute>
+        <Login2FA />
       </GuestRoute>
     ),
   },
@@ -48,6 +58,10 @@ export const router = createBrowserRouter([
         <ResetPassword />
       </GuestRoute>
     ),
+  },
+  {
+    path: '/auth/verify-2fa',
+    element: <Verify2FA />,
   },
   {
     path: ROUTES.profile,

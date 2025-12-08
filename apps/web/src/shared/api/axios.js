@@ -14,11 +14,14 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Don't retry on auth endpoints or initial auth check
+    const authEndpoints = ['/auth/refresh', '/auth/me', '/auth/login', '/auth/2fa', '/auth/registration', '/auth/oauth'];
+    const shouldSkipRefresh = authEndpoints.some(endpoint => originalRequest.url?.includes(endpoint));
+
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      originalRequest.url !== '/auth/refresh' &&
-      originalRequest.url !== '/auth/me'
+      !shouldSkipRefresh
     ) {
       originalRequest._retry = true;
 
@@ -26,6 +29,8 @@ api.interceptors.response.use(
         await api.post('/auth/refresh');
         return api(originalRequest);
       } catch (refreshError) {
+        // Don't redirect - just let the error propagate
+        // The app will handle unauthorized state via AuthContext
         return Promise.reject(refreshError);
       }
     }

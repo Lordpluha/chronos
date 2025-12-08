@@ -4,7 +4,7 @@ import { AppConfig } from '../../config/index.js'
 import { User } from '../../models/User.js'
 import { Session } from '../../models/Session.js'
 import { PasswordResetOtp } from '../../models/PasswordResetOtp.js'
-import { RegistrationTotp } from '../../models/RegistrationTotp.js'
+import { TwoFactorAuth } from '../../models/TwoFactorAuth.js'
 import {
   INVALID_OR_EXPIRED_CODE,
   INVALID_USERNAME_OR_PASSWORD,
@@ -67,19 +67,12 @@ class AuthService {
       throw err
     }
 
-    // Check 2FA if enabled
+    // Check if 2FA is enabled
     if (user.twoFactorEnabled) {
-      if (!token) {
-        const err = new Error('2FA token required')
-        err.requires2FA = true
-        throw err
-      }
-
-      const isValidToken = await this.verify2FAToken(user._id, token)
-      if (!isValidToken) {
-        const err = new Error('Invalid 2FA token')
-        throw err
-      }
+      const err = new Error('2FA verification required')
+      err.requires2FA = true
+      err.userId = user._id.toString()
+      throw err
     }
 
     // Update last login
@@ -87,8 +80,69 @@ class AuthService {
     await user.save()
 
     // Generate tokens
-    const access_token = JWTUtils.generateAccessToken(user._id, user.login)
-    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
+    const access_token = JWTUtils.generateAccessToken(user._id.toString(), user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id.toString(), user.login)
+
+    // Create session with IP address and device info
+    const session = new Session({
+      user: user._id,
+      access_token: access_token,
+      refresh_token: refresh_token,
+      ip_address: ipAddress,
+      device: deviceInfo,
+    })
+
+    await session.save()
+
+    return { access_token, refresh_token }
+  }
+
+  /**
+   * Login with 2FA verification
+   * @param {string} login
+   * @param {string} password
+   * @param {string} token
+   * @param {string|undefined} ipAddress
+   * @param {Object|undefined} deviceInfo
+   */
+  async loginWith2FA(login, password, token, ipAddress, deviceInfo) {
+    // Find user by username or email
+    const user = await User.findByEmailOrUsername(login)
+
+    if (!user) {
+      const err = new Error(INVALID_USERNAME_OR_PASSWORD)
+      throw err
+    }
+
+    // Check password
+    const isPasswordValid = await user.checkPassword(password)
+    if (!isPasswordValid) {
+      const err = new Error(INVALID_USERNAME_OR_PASSWORD)
+      throw err
+    }
+
+    // Check if 2FA is enabled
+    if (!user.twoFactorEnabled) {
+      const err = new Error('2FA is not enabled for this user')
+      err.status = 400
+      throw err
+    }
+
+    // Verify 2FA token
+    const isValidToken = await this.verify2FAToken(user._id.toString(), token)
+    if (!isValidToken) {
+      const err = new Error('Invalid 2FA token')
+      err.status = 400
+      throw err
+    }
+
+    // Update last login
+    user.lastLoginAt = new Date()
+    await user.save()
+
+    // Generate tokens
+    const access_token = JWTUtils.generateAccessToken(user._id.toString(), user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id.toString(), user.login)
 
     // Create session with IP address and device info
     const session = new Session({
@@ -228,7 +282,7 @@ class AuthService {
    * @param {Object} googleUser - Данные пользователя от Google
    * @param {string} ipAddress - IP адрес пользователя
    * @param {Object} deviceInfo - Информация о устройстве
-   * @returns {Promise<Object>} Токены доступа
+   * @returns {Promise<Object>} Токены доступа или информация о необходимости 2FA
    */
   async loginOrCreateGoogleUser(googleUser, ipAddress = null, deviceInfo = null) {
     const { googleId, email, name, given_name, family_name, picture } =
@@ -274,13 +328,25 @@ class AuthService {
       }
     }
 
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      // Generate temporary tokens for 2FA verification
+      const temp_access_token = JWTUtils.generateAccessToken(user._id.toString(), user.login)
+
+      return {
+        requires2FA: true,
+        temp_token: temp_access_token,
+        user_id: user._id.toString()
+      }
+    }
+
     // Update last login
     user.lastLoginAt = new Date()
     await user.save()
 
     // Generate tokens
-    const access_token = JWTUtils.generateAccessToken(user._id, user.login)
-    const refresh_token = JWTUtils.generateRefreshToken(user._id, user.login)
+    const access_token = JWTUtils.generateAccessToken(user._id.toString(), user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id.toString(), user.login)
 
     // Create session with IP address and device info
     const session = new Session({
@@ -351,32 +417,38 @@ class AuthService {
   /**
    * Настройка 2FA - генерация секретного ключа
    * @param {string} userId - ID пользователя
-   * @param {string} password - Текущий пароль для подтверждения
+   * @param {string} password - Текущий пароль для подтверждения (опционально для OAuth)
    * @returns {Promise<Object>} Объект с секретным ключом и QR кодом
    */
-  async setup2FA(userId, password) {
-    // Find user and check password
+  async setup2FA(userId, password = null) {
+    // Find user
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
       throw err
     }
 
-    const isPasswordValid = await user.checkPassword(password)
-    if (!isPasswordValid) {
-      const err = new Error('Invalid password')
-      throw err
+    // Check password only if user has password_hash (not OAuth user)
+    if (user.password_hash) {
+      if (!password) {
+        const err = new Error('Password is required')
+        throw err
+      }
+      const isPasswordValid = await user.checkPassword(password)
+      if (!isPasswordValid) {
+        const err = new Error('Invalid password')
+        throw err
+      }
     }
 
     // Generate secret key
     const secret = speakeasy.generateSecret({
       name: 'Chronos API',
-      account: `user_${userId}`,
       issuer: 'Chronos',
     })
 
-    // Save or update TOTP record (but don't enable yet)
-    await RegistrationTotp.findOneAndUpdate(
+    // Save or update 2FA record (but don't enable yet)
+    await TwoFactorAuth.findOneAndUpdate(
       { userId },
       {
         secretKey: secret.base32,
@@ -399,33 +471,40 @@ class AuthService {
    * Включение 2FA после верификации токена
    * @param {string} userId - ID пользователя
    * @param {string} token - TOTP токен для верификации
-   * @param {string} password - Текущий пароль для подтверждения
+   * @param {string} password - Текущий пароль для подтверждения (опционально для OAuth)
    * @returns {Promise<Array>} Массив backup кодов
    */
-  async enable2FA(userId, token, password) {
-    // Find user and check password
+  async enable2FA(userId, token, password = null) {
+    // Find user
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
       throw err
     }
 
-    const isPasswordValid = await user.checkPassword(password)
-    if (!isPasswordValid) {
-      const err = new Error('Invalid password')
-      throw err
+    // Check password only if user has password_hash (not OAuth user)
+    if (user.password_hash) {
+      if (!password) {
+        const err = new Error('Password is required')
+        throw err
+      }
+      const isPasswordValid = await user.checkPassword(password)
+      if (!isPasswordValid) {
+        const err = new Error('Invalid password')
+        throw err
+      }
     }
 
-    // Get TOTP record
-    const totpRecord = await RegistrationTotp.findOne({ userId })
-    if (!totpRecord) {
+    // Get 2FA record
+    const twoFactorRecord = await TwoFactorAuth.findByUserId(userId)
+    if (!twoFactorRecord) {
       const err = new Error('2FA not set up. Please run setup first.')
       throw err
     }
 
     // Verify token
     const verified = speakeasy.totp.verify({
-      secret: totpRecord.secretKey,
+      secret: twoFactorRecord.secretKey,
       encoding: 'base32',
       token: token,
       window: 1,
@@ -437,13 +516,12 @@ class AuthService {
     }
 
     // Generate backup codes
-    const backupCodes = this.generateBackupCodes()
+    const backupCodes = twoFactorRecord.generateBackupCodes()
 
     // Enable 2FA
-    totpRecord.isEnabled = true
-    totpRecord.backupCodes = backupCodes
-    totpRecord.enabledAt = new Date()
-    await totpRecord.save()
+    twoFactorRecord.isEnabled = true
+    twoFactorRecord.enabledAt = new Date()
+    await twoFactorRecord.save()
 
     // Update user record
     user.twoFactorEnabled = true
@@ -455,28 +533,35 @@ class AuthService {
   /**
    * Отключение 2FA
    * @param {string} userId - ID пользователя
-   * @param {string} password - Текущий пароль для подтверждения
+   * @param {string} password - Текущий пароль для подтверждения (опционально для OAuth)
    */
-  async disable2FA(userId, password) {
-    // Find user and check password
+  async disable2FA(userId, password = null) {
+    // Find user
     const user = await User.findById(userId)
     if (!user) {
       const err = new Error('User not found')
       throw err
     }
 
-    const isPasswordValid = await user.checkPassword(password)
-    if (!isPasswordValid) {
-      const err = new Error('Invalid password')
-      throw err
+    // Check password only if user has password_hash (not OAuth user)
+    if (user.password_hash) {
+      if (!password) {
+        const err = new Error('Password is required')
+        throw err
+      }
+      const isPasswordValid = await user.checkPassword(password)
+      if (!isPasswordValid) {
+        const err = new Error('Invalid password')
+        throw err
+      }
     }
 
     // Disable 2FA
     user.twoFactorEnabled = false
     await user.save()
 
-    // Remove TOTP data
-    await RegistrationTotp.deleteOne({ userId })
+    // Remove 2FA data
+    await TwoFactorAuth.deleteOne({ userId })
   }
 
   /**
@@ -486,54 +571,31 @@ class AuthService {
    * @returns {Promise<boolean>} Результат проверки
    */
   async verify2FAToken(userId, token) {
-    const totpRecord = await RegistrationTotp.findOne({
+    const twoFactorRecord = await TwoFactorAuth.findOne({
       userId,
       isEnabled: true,
     })
 
-    if (!totpRecord) {
+    if (!twoFactorRecord) {
       return false
     }
 
     // First try TOTP token
-    const verified = speakeasy.totp.verify({
-      secret: totpRecord.secretKey,
-      encoding: 'base32',
-      token: token,
-      window: 1,
-    })
+    const verified = twoFactorRecord.verifyToken(token)
 
     if (verified) {
       return true
     }
 
     // If TOTP failed, try backup codes
-    if (totpRecord.backupCodes && totpRecord.backupCodes.length > 0) {
-      const codeIndex = totpRecord.backupCodes.indexOf(token)
-
-      if (codeIndex !== -1) {
-        // Remove used backup code
-        totpRecord.backupCodes.splice(codeIndex, 1)
-        await totpRecord.save()
+    if (twoFactorRecord.backupCodes && twoFactorRecord.backupCodes.length > 0) {
+      const backupCodeValid = await twoFactorRecord.verifyBackupCode(token)
+      if (backupCodeValid) {
         return true
       }
     }
 
     return false
-  }
-
-  /**
-   * Генерация backup кодов
-   * @returns {Array<string>} Массив backup кодов
-   */
-  generateBackupCodes() {
-    const codes = []
-    for (let i = 0; i < 10; i++) {
-      // Генерируем 8-значный код
-      const code = Math.random().toString(36).substring(2, 10).toUpperCase()
-      codes.push(code)
-    }
-    return codes
   }
 
   /**
@@ -548,18 +610,65 @@ class AuthService {
       throw err
     }
 
-    const totpRecord = await RegistrationTotp.findOne({ userId })
+    const twoFactorRecord = await TwoFactorAuth.findByUserId(userId)
 
     let backupCodesCount = 0
-    if (totpRecord?.backupCodes) {
-      backupCodesCount = totpRecord.backupCodes.length
+    if (twoFactorRecord?.backupCodes) {
+      backupCodesCount = twoFactorRecord.backupCodes.length
     }
 
     return {
       is2FAEnabled: user.twoFactorEnabled,
-      isSetup: !!totpRecord,
+      isSetup: !!twoFactorRecord,
       backupCodesCount: backupCodesCount,
     }
+  }
+
+  /**
+   * Верификация 2FA для OAuth логина
+   * @param {string} tempToken - Временный токен
+   * @param {string} token - 2FA токен
+   * @param {string} ipAddress - IP адрес
+   * @param {Object} deviceInfo - Информация об устройстве
+   * @returns {Promise<Object>} Финальные токены доступа
+   */
+  async verifyOAuth2FA(tempToken, token, ipAddress = null, deviceInfo = null) {
+    // Verify temporary token
+    const { userId } = JWTUtils.verifyToken(tempToken)
+
+    const user = await User.findById(userId)
+    if (!user) {
+      const err = new Error('User not found')
+      throw err
+    }
+
+    // Verify 2FA token
+    const isValidToken = await this.verify2FAToken(userId.toString(), token)
+    if (!isValidToken) {
+      const err = new Error('Invalid 2FA token')
+      throw err
+    }
+
+    // Update last login
+    user.lastLoginAt = new Date()
+    await user.save()
+
+    // Generate final tokens
+    const access_token = JWTUtils.generateAccessToken(user._id.toString(), user.login)
+    const refresh_token = JWTUtils.generateRefreshToken(user._id.toString(), user.login)
+
+    // Create session
+    const session = new Session({
+      user: user._id,
+      access_token: access_token,
+      refresh_token: refresh_token,
+      ip_address: ipAddress,
+      device: deviceInfo,
+    })
+
+    await session.save()
+
+    return { access_token, refresh_token }
   }
 }
 

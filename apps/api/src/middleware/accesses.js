@@ -27,8 +27,7 @@ export const requireAccessToken = async (req, res, next) => {
     req.accessCookie = access
     next()
   } catch (err) {
-
-    return res.status(401).json()
+    return res.status(401).json({ message: err.message || 'Invalid or missing access token' })
   }
 }
 
@@ -56,8 +55,7 @@ export const requireRefreshToken = async (req, res, next) => {
     req.refreshCookie = refresh
     next()
   } catch (err) {
-
-    return res.status(401)
+    return res.status(401).json({ message: err.message || 'Invalid or missing refresh token' })
   }
 }
 

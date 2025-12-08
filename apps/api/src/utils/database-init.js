@@ -7,6 +7,7 @@ import { Task } from '../models/Task.js'
 import { TaskList } from '../models/TaskList.js'
 import { PasswordResetOtp } from '../models/PasswordResetOtp.js'
 import { RegistrationTotp } from '../models/RegistrationTotp.js'
+import { TwoFactorAuth } from '../models/TwoFactorAuth.js'
 
 /**
  * Initialize database indexes and collections
@@ -22,6 +23,7 @@ export async function initializeDatabase() {
     await PasswordResetOtp.ensureIndexes()
     await RegistrationTotp.ensureIndexes()
     await Reminder.ensureIndexes()
+    await TwoFactorAuth.ensureIndexes()
 
     // Handle Session indexes separately to catch index conflicts
     try {

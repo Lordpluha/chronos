@@ -326,9 +326,24 @@ export const DayView = () => {
                 </span>
               </div>
               <div
-                className="flex-1 relative"
+                className="flex-1 relative hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, hour)}
+                onClick={(e) => {
+                  // Calculate clicked time based on mouse position
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const offsetY = e.clientY - rect.top;
+                  const minutes = Math.floor((offsetY / rect.height) * 60);
+                  const clickedHour = hour;
+                  const clickedMinute = minutes;
+                  const startTime = `${String(clickedHour).padStart(2, '0')}:${String(clickedMinute).padStart(2, '0')}`;
+                  const endHour = clickedMinute >= 30 ? clickedHour + 1 : clickedHour;
+                  const endMinute = clickedMinute >= 30 ? clickedMinute - 30 : clickedMinute + 30;
+                  const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+
+                  setSelectedEvent({ startTime, endTime });
+                  setShowEventModal(true);
+                }}
               />
             </div>
           ))}

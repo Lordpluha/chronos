@@ -100,7 +100,6 @@ export function ForgotPasswordForm({ className, ...props }) {
           <Input
             id="email"
             type="email"
-            placeholder="m@example.com"
             disabled={isLoading}
             {...register("email")}
           />

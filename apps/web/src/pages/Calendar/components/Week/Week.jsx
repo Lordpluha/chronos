@@ -353,11 +353,27 @@ export const Week = () => {
               {weekDays.map((day, idx) => (
                 <div
                   key={idx}
-                  className={`border-r dark:border-gray-700 relative hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                  className={`border-r dark:border-gray-700 relative hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer ${
                     isToday(day) ? 'bg-blue-50/30 dark:bg-blue-900/20' : ''
                   }`}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, day, hour)}
+                  onClick={(e) => {
+                    // Calculate clicked time based on mouse position
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const offsetY = e.clientY - rect.top;
+                    const minutes = Math.floor((offsetY / rect.height) * 60);
+                    const clickedHour = hour;
+                    const clickedMinute = minutes;
+                    const startTime = `${String(clickedHour).padStart(2, '0')}:${String(clickedMinute).padStart(2, '0')}`;
+                    const endHour = clickedMinute >= 30 ? clickedHour + 1 : clickedHour;
+                    const endMinute = clickedMinute >= 30 ? clickedMinute - 30 : clickedMinute + 30;
+                    const endTime = `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+
+                    setDaySelected(day);
+                    setSelectedEvent({ startTime, endTime });
+                    setShowEventModal(true);
+                  }}
                 />
               ))}
             </div>

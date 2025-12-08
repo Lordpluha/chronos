@@ -9,8 +9,12 @@ import { Upload, User, Mail, Lock, Shield, Trash2 } from 'lucide-react';
 import { AvatarUpload } from '../components/AvatarUpload';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { DeleteAccountModal } from '../components/DeleteAccountModal';
+import { TwoFactorSetupDialog } from '@features/Auth/components/TwoFactorSetup';
+import { BackupCodesDialog } from '@features/Auth/components/BackupCodesDialog';
+import { TwoFactorDisableDialog } from '@features/Auth/components/TwoFactorDisable';
 import { toast } from 'sonner';
 import { UserApi } from '@entities/User';
+import { AuthApi } from '@features/Auth';
 import { useAuth } from '@shared/context/AuthContext';
 
 export function ProfileTab({ user }) {
@@ -18,6 +22,11 @@ export function ProfileTab({ user }) {
   const [showAvatarUpload, setShowAvatarUpload] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [show2FASetup, setShow2FASetup] = useState(false);
+  const [show2FADisable, setShow2FADisable] = useState(false);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [backupCodes, setBackupCodes] = useState([]);
+  const [twoFactorStatus, setTwoFactorStatus] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -32,6 +41,22 @@ export function ProfileTab({ user }) {
         full_name: user.full_name || '',
         email: user.email || '',
       });
+    }
+  }, [user]);
+
+  // Fetch 2FA status
+  useEffect(() => {
+    const fetch2FAStatus = async () => {
+      try {
+        const status = await AuthApi.get2FAStatus();
+        setTwoFactorStatus(status);
+      } catch (error) {
+        console.error('Failed to fetch 2FA status:', error);
+      }
+    };
+
+    if (user) {
+      fetch2FAStatus();
     }
   }, [user]);
 
@@ -53,7 +78,7 @@ export function ProfileTab({ user }) {
 
   const handleAvatarUpload = async (file) => {
     try {
-      const result = await UserApi.uploadAvatar(file);
+      await UserApi.uploadAvatar(file);
       toast.success('Avatar uploaded successfully');
       setShowAvatarUpload(false);
       // Refresh user data
@@ -62,6 +87,21 @@ export function ProfileTab({ user }) {
       console.error('Failed to upload avatar:', error);
       toast.error(error.response?.data?.message || 'Failed to upload avatar');
     }
+  };
+
+  const handle2FASetupSuccess = (codes) => {
+    setBackupCodes(codes);
+    setShowBackupCodes(true);
+    // Refresh status
+    AuthApi.get2FAStatus().then(setTwoFactorStatus);
+    refreshUser();
+  };
+
+  const handleDisable2FASuccess = () => {
+    toast.success('2FA disabled successfully');
+    // Refresh status
+    AuthApi.get2FAStatus().then(setTwoFactorStatus);
+    refreshUser();
   };
 
   const getInitials = (name) => {
@@ -216,12 +256,27 @@ export function ProfileTab({ user }) {
               <div>
                 <p className="font-medium">Two-Factor Authentication</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {user?.is_two_factor_enabled ? 'Enabled' : 'Not enabled'}
+                  {twoFactorStatus?.is2FAEnabled ? (
+                    <>
+                      Enabled • {twoFactorStatus.backupCodesCount} backup codes remaining
+                    </>
+                  ) : (
+                    'Not enabled'
+                  )}
                 </p>
               </div>
             </div>
-            <Button variant="outline">
-              {user?.is_two_factor_enabled ? 'Disable' : 'Enable'} 2FA
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (twoFactorStatus?.is2FAEnabled) {
+                  setShow2FADisable(true);
+                } else {
+                  setShow2FASetup(true);
+                }
+              }}
+            >
+              {twoFactorStatus?.is2FAEnabled ? 'Disable' : 'Enable'} 2FA
             </Button>
           </div>
         </CardContent>
@@ -278,6 +333,24 @@ export function ProfileTab({ user }) {
           isGoogleUser={!!user?.google_id}
         />
       )}
+
+      <TwoFactorSetupDialog
+        open={show2FASetup}
+        onOpenChange={setShow2FASetup}
+        onSuccess={handle2FASetupSuccess}
+      />
+
+      <TwoFactorDisableDialog
+        open={show2FADisable}
+        onOpenChange={setShow2FADisable}
+        onSuccess={handleDisable2FASuccess}
+      />
+
+      <BackupCodesDialog
+        open={showBackupCodes}
+        onOpenChange={setShowBackupCodes}
+        backupCodes={backupCodes}
+      />
     </>
   );
 }

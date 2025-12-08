@@ -38,6 +38,8 @@ export default function Day({ day }) {
         className="flex-1 cursor-pointer overflow-y-auto scrollbar-custom"
         onClick={() => {
           setDaySelected(day);
+          setSelectedEvent(null);
+          setShowEventModal(true);
         }}
       >
         {dayEvents.map((evt, idx) => (

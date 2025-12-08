@@ -13,7 +13,6 @@ export function RegistrationFields({ register, errors, isLoading }) {
         <Input
           id="login"
           type="text"
-          placeholder="john_doe"
           disabled={isLoading}
           aria-invalid={!!errors.login}
           {...register("login")}
@@ -25,7 +24,6 @@ export function RegistrationFields({ register, errors, isLoading }) {
         <Input
           id="full_name"
           type="text"
-          placeholder="John Doe"
           disabled={isLoading}
           aria-invalid={!!errors.full_name}
           {...register("full_name")}
@@ -37,7 +35,6 @@ export function RegistrationFields({ register, errors, isLoading }) {
         <Input
           id="email"
           type="email"
-          placeholder="m@example.com"
           disabled={isLoading}
           aria-invalid={!!errors.email}
           {...register("email")}

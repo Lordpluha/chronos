@@ -11,7 +11,6 @@ import { useNavigate } from "react-router";
 import { useAuth } from "@shared/context/AuthContext";
 import { LoginFormHeader } from "./LoginFormHeader";
 import { LoginFields } from "./LoginFields";
-import { TwoFactorField } from "./TwoFactorField";
 import { SocialLogin } from "../common/SocialLogin";
 
 const loginSchema = z.object({
@@ -23,7 +22,6 @@ const loginSchema = z.object({
     .string()
     .min(1, "Password is required")
     .max(128, "Password must be less than 128 characters"),
-  token: z.string().optional(),
 });
 
 export function LoginForm({ className, ...props }) {
@@ -32,7 +30,6 @@ export function LoginForm({ className, ...props }) {
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [requires2FA, setRequires2FA] = React.useState(false);
 
   const {
     register,
@@ -55,10 +52,21 @@ export function LoginForm({ className, ...props }) {
       navigate(ROUTES.calendar);
     } catch (error) {
       console.error("Login error:", error);
+      console.log("Error response:", error.response);
+      console.log("Error status:", error.response?.status);
+      console.log("Error data:", error.response?.data);
+      console.log("Requires 2FA?", error.response?.data?.requires2FA);
 
-      if (error.response?.status === 422 && error.response?.data?.requires2FA) {
-        setRequires2FA(true);
-        toast.error("Please enter your 2FA code");
+      // Check for 2FA requirement (403 status with requires2FA flag)
+      if (error.response?.status === 403 && error.response?.data?.requires2FA) {
+        console.log("✅ 2FA detected! Redirecting to /auth/2fa");
+        toast("2FA verification required", { icon: '🔐' });
+        // Store credentials in sessionStorage for 2FA page
+        sessionStorage.setItem('2fa_login', data.login);
+        sessionStorage.setItem('2fa_password', data.password);
+        // Use window.location for immediate redirect
+        window.location.href = '/auth/2fa';
+        return;
       } else if (error.response?.status === 401) {
         // Unauthorized - invalid credentials
         setError("login", {
@@ -144,13 +152,6 @@ export function LoginForm({ className, ...props }) {
           showPassword={showPassword}
           setShowPassword={setShowPassword}
         />
-        {requires2FA && (
-          <TwoFactorField
-            register={register}
-            error={errors.token?.message}
-            isLoading={isLoading}
-          />
-        )}
         {errors.root && (
           <FieldError className="text-center">{errors.root.message}</FieldError>
         )}

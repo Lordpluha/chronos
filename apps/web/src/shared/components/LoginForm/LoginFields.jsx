@@ -12,7 +12,6 @@ export function LoginFields({ register, errors, isLoading, showPassword, setShow
         <Input
           id="login"
           type="text"
-          placeholder="m@example.com or username"
           disabled={isLoading}
           aria-invalid={!!errors.login}
           {...register("login")}
