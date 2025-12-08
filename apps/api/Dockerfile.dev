@@ -1,0 +1,29 @@
+# Dev Dockerfile для API с hot-reload (nodemon)
+
+FROM node:20-alpine AS base
+
+FROM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+RUN npm install -g turbo
+COPY . .
+RUN turbo prune chronos-api --docker
+
+FROM base AS installer
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies
+COPY --from=builder /app/out/json/ .
+RUN npm install
+
+# Copy source code
+COPY --from=builder /app/out/full/ .
+
+# Install nodemon for hot-reload
+RUN npm install -g nodemon
+
+EXPOSE 3001
+
+# Nodemon будет следить за изменениями в /app/apps/api
+CMD ["npm", "run", "dev", "--workspace=chronos-api"]

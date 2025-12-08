@@ -1,0 +1,136 @@
+services:
+  # Frontend с hot-reload
+  web:
+    container_name: chronos-web-dev
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code для hot-reload
+      - ./apps/web:/app/apps/web
+      - ./package.json:/app/package.json
+      - ./turbo.json:/app/turbo.json
+      # Не монтируем node_modules (используем из контейнера)
+      - /app/node_modules
+      - /app/apps/web/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:${BACK_PORT:-3001}/api
+    networks:
+      - app_network
+    command: npm run dev --workspace=chronos-web -- --host 0.0.0.0
+    develop:
+      watch:
+        # Пересоздать контейнер при изменении package.json
+        - action: rebuild
+          path: ./apps/web/package.json
+        # Пересоздать при изменении Dockerfile
+        - action: rebuild
+          path: ./apps/web/Dockerfile.dev
+        # Синхронизировать изменения кода (hot-reload через Vite)
+        - action: sync
+          path: ./apps/web/src
+          target: /app/apps/web/src
+
+  # Backend с hot-reload (nodemon)
+  api:
+    container_name: chronos-api-dev
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "${BACK_PORT:-3001}:${BACK_PORT:-3001}"
+    volumes:
+      # Mount source code для hot-reload
+      - ./apps/api:/app/apps/api
+      - ./package.json:/app/package.json
+      - ./turbo.json:/app/turbo.json
+      # Не монтируем node_modules (используем из контейнера)
+      - /app/node_modules
+      - /app/apps/api/node_modules
+      # Сохраняем uploads между перезапусками
+      - api_uploads:/app/apps/api/uploads
+    environment:
+      - NODE_ENV=development
+      - BACK_PORT=${BACK_PORT:-3001}
+      - BACK_HOST=0.0.0.0
+      - FRONT_HOST=localhost
+      - FRONT_PORT=5173
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin_password}@mongodb:27017/${DB_NAME:-chronos}?authSource=admin
+      - DB_NAME=${DB_NAME:-chronos}
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
+      - REFRESH_TOKEN_LIFETIME=${REFRESH_TOKEN_LIFETIME:-7d}
+      - ACCESS_TOKEN_NAME=${ACCESS_TOKEN_NAME:-access_token}
+      - REFRESH_TOKEN_NAME=${REFRESH_TOKEN_NAME:-refresh_token}
+      - CODE_LIFETIME=${CODE_LIFETIME:-5m}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+    networks:
+      - app_network
+    depends_on:
+      - mongodb
+    command: npm run dev --workspace=chronos-api
+    develop:
+      watch:
+        # Пересоздать контейнер при изменении package.json
+        - action: rebuild
+          path: ./apps/api/package.json
+        # Пересоздать при изменении Dockerfile
+        - action: rebuild
+          path: ./apps/api/Dockerfile.dev
+        # Синхронизировать изменения кода (auto-restart через nodemon)
+        - action: sync
+          path: ./apps/api/src
+          target: /app/apps/api/src
+
+  # MongoDB
+  mongodb:
+    container_name: chronos-mongodb-dev
+    image: mongo:7.0
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-admin_password}
+      - MONGO_INITDB_DATABASE=${DB_NAME:-chronos}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - app_network
+
+  # MongoDB Admin UI
+  mongo-express:
+    container_name: chronos-mongo-admin-dev
+    image: mongo-express:latest
+    restart: unless-stopped
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_ROOT_PASSWORD:-admin_password}
+      - ME_CONFIG_MONGODB_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin_password}@mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-admin}
+    networks:
+      - app_network
+    depends_on:
+      - mongodb
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  mongodb_data_dev:
+  api_uploads:

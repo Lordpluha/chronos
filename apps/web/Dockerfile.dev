@@ -1,0 +1,26 @@
+# Dev Dockerfile для Web с hot-reload (Vite)
+
+FROM node:20-alpine AS base
+
+FROM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+RUN npm install -g turbo
+COPY . .
+RUN turbo prune chronos-web --docker
+
+FROM base AS dev
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies
+COPY --from=builder /app/out/json/ .
+RUN npm install
+
+# Copy source code
+COPY --from=builder /app/out/full/ .
+
+EXPOSE 5173
+
+# Vite dev server с hot-reload
+CMD ["npm", "run", "dev", "--workspace=chronos-web", "--", "--host", "0.0.0.0"]

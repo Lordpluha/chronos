@@ -135,142 +135,220 @@ Before you begin, ensure you have the following installed:
 
 ## 🚀 Getting Started
 
-### Local Development
+### Quick Start
 
-1. **Clone the repository**
+1. **Клонируйте репозиторий**
    ```bash
    git clone https://github.com/Lordpluha/chronos.git
    cd chronos
    ```
 
-2. **Install dependencies**
+2. **Создайте `.env` файл**
+   ```bash
+   cp .env.example .env
+   # Отредактируйте .env и добавьте реальные значения
+   ```
+
+3. **Выберите режим запуска:**
+
+   **🐳 Docker (рекомендуется):**
+   ```bash
+   # Development с hot-reload
+   npm run docker:dev
+
+   # Production
+   npm run docker:prod
+   ```
+
+   **💻 Локально:**
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+4. **Доступ к приложению:**
+   - Frontend: http://localhost:5173 (dev) или http://localhost:3000 (prod)
+   - API: http://localhost:3001/api
+   - MongoDB Admin: http://localhost:8081
+
+📚 **Подробная документация:** См. [DOCKER_QUICK_START.md](./DOCKER_QUICK_START.md) и [DOCKER_DEV_MODE.md](./DOCKER_DEV_MODE.md)
+
+### 💻 Локальная разработка
+
+**Вариант 1: Полностью локально**
+
+1. **Установите зависимости**
    ```bash
    npm install
    ```
 
-3. **Set up environment variables**
-   
-   Create `.env.local` file in `apps/api/` directory:
+2. **Создайте `.env.local` в `apps/api/`**
+   ```bash
+   cp apps/api/.env.example apps/api/.env.local
+   # Настройте подключение к локальной MongoDB
+   ```
+
+3. **Запустите MongoDB локально**
+   ```bash
+   mongod --dbpath /path/to/db
+   ```
+
+4. **Запустите dev серверы**
+   ```bash
+   npm run dev
+   ```
+   - Frontend: http://localhost:5173
+   - Backend: http://localhost:3001
+
+**Вариант 2: БД в Docker, код локально (рекомендуется)**
+
+1. **Запустите только БД и админку**
+   ```bash
+   docker-compose up -d mongodb mongo-express
+   ```
+
+2. **Установите зависимости**
+   ```bash
+   npm install
+   ```
+
+3. **Создайте `.env.local` в `apps/api/`**
    ```bash
    cp apps/api/.env.example apps/api/.env.local
    ```
-   
-   See [Environment Variables](#-environment-variables) section for required variables.
 
-4. **Start MongoDB**
-   
-   If using Docker for MongoDB only:
-   ```bash
-   npm run docker:db
+   Убедитесь что MongoDB URI указывает на Docker:
+   ```env
+   MONGODB_URI=mongodb://admin:admin_password@localhost:27017/chronos?authSource=admin
    ```
-   
-   Or start your local MongoDB instance.
 
-5. **Start the development server**
+4. **Запустите dev серверы**
    ```bash
    npm run dev
    ```
 
-   This will start:
-   - Frontend: http://localhost:5173
-   - Backend: http://localhost:3001
+**Вариант 3: Backend в Docker, Frontend локально**
 
-### Docker Development
-
-1. **Clone the repository**
+1. **Запустите API и БД**
    ```bash
-   git clone https://github.com/Lordpluha/chronos.git
-   cd chronos
+   docker-compose up -d mongodb mongo-express api
    ```
 
-2. **Set up environment variables**
-   
-   Create `.env.local` file in `apps/api/` directory with your configuration.
-
-3. **Start with Docker Compose**
-   
-   For local development (with local MongoDB):
+2. **Запустите только фронтенд локально**
    ```bash
-   npm run docker:dev
+   cd apps/web
+   npm run dev
    ```
-   
-   For development with MongoDB Atlas:
+   - Frontend с hot-reload: http://localhost:5173
+   - API в Docker: http://localhost:3001
+
+**Вариант 4: Frontend в Docker, Backend локально**
+
+1. **Запустите Web и БД**
    ```bash
-   npm run docker:dev-atlas
-   ```
-
-4. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend: http://localhost:3001
-   - MongoDB: mongodb://localhost:27017 (if using local MongoDB)
-
-### Production Deployment
-
-1. **Set up production environment variables**
-   
-   Create `.env.production` file in the root directory:
-   ```bash
-   cp .env.example .env.production
+   docker compose up -d mongodb mongo-express web
    ```
 
-2. **Deploy with Docker Compose**
+2. **Запустите только бэкенд локально**
    ```bash
-   npm run docker:prod
+   cd apps/api
+   npm run dev
    ```
-
-3. **View logs**
-   ```bash
-   npm run docker:logs
-   ```
+   - Frontend в Docker: http://localhost:3000
+   - API с hot-reload: http://localhost:3001
 
 ## 🔧 Environment Variables
 
-Create `apps/api/.env.local` file with the following variables:
+### Docker (корневой `.env`)
 
-### Server Configuration
+Для Docker создайте `.env` в корне проекта:
+
+```env
+# Ports
+FRONT_PORT=3000
+BACK_PORT=3001
+MONGO_PORT=27017
+MONGO_EXPRESS_PORT=8081
+
+# Hosts
+FRONT_HOST=localhost
+BACK_HOST=0.0.0.0
+
+# Database
+DB_NAME=chronos
+MONGO_ROOT_USERNAME=admin
+MONGO_ROOT_PASSWORD=admin_password
+
+# MongoDB Admin UI
+MONGO_EXPRESS_USERNAME=admin
+MONGO_EXPRESS_PASSWORD=admin
+
+# Security
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+ACCESS_TOKEN_LIFETIME=15m
+REFRESH_TOKEN_LIFETIME=7d
+ACCESS_TOKEN_NAME=access_token
+REFRESH_TOKEN_NAME=refresh_token
+CODE_LIFETIME=5m
+
+# Email (SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# Google OAuth
+OAUTH_CLIENT_ID=your-google-client-id
+OAUTH_CLIENT_SECRET=your-google-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
+
+# MongoDB Atlas (для production)
+MONGODB_ATLAS_URI=mongodb+srv://username:password@cluster.mongodb.net/chronos
+
+# Node Environment
+NODE_ENV=development
+```
+
+### Локальная разработка (`apps/api/.env.local`)
+
+Для локального запуска создайте `apps/api/.env.local`:
+
 ```env
 NODE_ENV=development
 BACK_PORT=3001
 BACK_HOST=0.0.0.0
 FRONT_HOST=localhost
 FRONT_PORT=5173
-```
 
-### Database
-```env
-# For MongoDB Atlas (serverless)
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/chronos?retryWrites=true&w=majority
-
-# For local MongoDB
-# MONGODB_URI=mongodb://admin:admin_password@localhost:27017/chronos?authSource=admin
-
+# Локальная MongoDB или Docker MongoDB
+MONGODB_URI=mongodb://admin:admin_password@localhost:27017/chronos?authSource=admin
 DB_NAME=chronos
-```
 
-### JWT Authentication
-```env
 JWT_SECRET=your-super-secret-jwt-key-change-this
 ACCESS_TOKEN_LIFETIME=15m
 REFRESH_TOKEN_LIFETIME=7d
 ACCESS_TOKEN_NAME=access_token
 REFRESH_TOKEN_NAME=refresh_token
 CODE_LIFETIME=5m
-```
 
-### Email (SMTP)
-```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
-```
 
-### Google OAuth
-```env
 OAUTH_CLIENT_ID=your-google-client-id
 OAUTH_CLIENT_SECRET=your-google-client-secret
 GOOGLE_CALLBACK_URL=http://localhost:3001/api/auth/google/callback
 ```
+
+### 🔐 Получение OAuth credentials
+
+1. Откройте [Google Cloud Console](https://console.cloud.google.com/)
+2. Создайте новый проект
+3. Перейдите в **APIs & Services → Credentials**
+4. Создайте **OAuth client ID** → **Web application**
+5. Добавьте redirect URI: `http://localhost:3001/api/auth/google/callback`
+6. Скопируйте Client ID и Client Secret в `.env`
 
 ## 📚 API Documentation
 
@@ -339,27 +417,100 @@ Key models:
 
 ## 🔨 Available Scripts
 
-### Root Level
+### Основные команды
+
 ```bash
-npm run dev          # Start all services in development mode
-npm run build        # Build all applications
-npm run lint         # Lint all applications
-npm run format       # Format code with Biome
-npm run clean        # Clean build artifacts
+# Локальная разработка
+npm run dev              # Запуск frontend + backend локально
+npm run build            # Сборка всех приложений
+npm run lint             # Линтинг кода
+npm run format           # Форматирование кода
+npm run test             # Запуск тестов
+npm run clean            # Очистка build артефактов
 ```
 
-### Docker Commands
+### Docker команды
+
+#### Development (с hot-reload)
 ```bash
-npm run docker:dev           # Start development with local MongoDB
-npm run docker:dev-atlas     # Start development with MongoDB Atlas
-npm run docker:prod          # Start production deployment
-npm run docker:db            # Start only MongoDB
-npm run docker:api           # Start only API service
-npm run docker:web           # Start only web service
-npm run docker:logs          # View logs
-npm run docker:stop          # Stop all services
-npm run docker:clean         # Clean Docker volumes and images
+npm run docker:dev           # 🔥 Запуск dev режима с auto-rebuild
+npm run docker:dev:build     # Запуск с пересборкой образов
+npm run docker:dev:logs      # Просмотр логов
+npm run docker:dev:down      # Остановить и удалить контейнеры
 ```
+
+**Особенности dev режима:**
+- Автоматический hot-reload (Vite HMR + Nodemon)
+- Auto-rebuild при изменении `package.json` или `Dockerfile.dev`
+- Volumes для синхронизации кода
+- Порты: Frontend (5173), API (3001)
+
+#### Production
+```bash
+npm run docker:prod          # 🚀 Запуск production сборки
+npm run docker:prod:rebuild  # Полная пересборка и запуск
+npm run docker:prod:logs     # Просмотр логов
+npm run docker:prod:down     # Остановить и удалить контейнеры
+```
+
+**Production особенности:**
+- Оптимизированная сборка
+- Nginx для frontend
+- Порты: Frontend (3000), API (3001)
+
+#### Утилиты
+```bash
+npm run docker:db            # Запустить только MongoDB + Admin UI
+npm run docker:clean         # Остановить контейнеры и удалить volumes
+npm run docker:clean:all     # Полная очистка (контейнеры, volumes, images)
+```
+
+### Примеры использования
+
+**Разработка с Docker:**
+```bash
+# Запустить и работать с hot-reload
+npm run docker:dev
+
+# В другом терминале смотреть логи
+npm run docker:dev:logs
+
+# Остановить когда закончили
+npm run docker:dev:down
+```
+
+**Разработка локально (только БД в Docker):**
+```bash
+# Запустить только MongoDB и админку
+npm run docker:db
+
+# В другом терминале запустить приложение
+npm run dev
+```
+
+**Production деплой:**
+```bash
+# Создать .env с production настройками
+cp .env.example .env
+
+# Запустить production версию
+npm run docker:prod
+```
+
+**Полная очистка и перезапуск:**
+```bash
+# Удалить всё
+npm run docker:clean:all
+
+# Запустить заново
+npm run docker:dev
+```
+
+### Требования
+
+- **Docker Compose v2.22+** - для `--watch` режима в dev
+- **Node.js 20+** - для локальной разработки
+- **npm 7+** - менеджер пакетов
 
 ## 🤝 Contributing
 

@@ -3,26 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
-    "clean": "turbo run clean",
     "dev": "turbo run dev",
-    "format": "turbo run format",
+    "build": "turbo run build",
     "lint": "turbo run lint",
+    "format": "turbo run format",
     "test": "turbo run test",
-    
-    "docker:dev": "docker compose --profile development up --build",
-    "docker:dev-atlas": "docker compose --env-file ./apps/api/.env.local up api web --build",
-    "docker:prod": "docker compose -f docker-compose.prod.yml --env-file .env.production up --build -d",
-    "docker:build": "docker compose build",
-    "docker:clean": "docker compose down -v && docker system prune -f",
-    "docker:logs": "docker compose logs -f",
-    "docker:db": "docker compose --env-file ./apps/api/.env.local --profile development up mongodb -d",
-    "docker:api" : "docker compose --env-file ./apps/api/.env.local --profile development up api --build -d",
-    "docker:web" : "docker compose --env-file ./apps/api/.env.local --profile development up web --build -d",
-    "docker:stop": "docker compose down"
-  },
-  "dependencies": {
-    "dayjs": "^1.11.19"
+    "clean": "turbo run clean",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up --watch",
+    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:dev:daemon": "docker compose -f docker-compose.dev.yml up -d --build",
+    "docker:dev:logs": "docker compose -f docker-compose.dev.yml logs -f",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:prod": "docker compose up -d --build",
+    "docker:prod:rebuild": "docker compose down && docker compose up -d --build",
+    "docker:prod:logs": "docker compose logs -f",
+    "docker:prod:down": "docker compose down",
+    "docker:db": "docker compose up -d mongodb mongo-express",
+    "docker:clean": "docker compose down -v",
+    "docker:clean:all": "docker compose down -v && docker system prune -af --volumes"
   },
   "devDependencies": {
     "turbo": "^2.6.0"

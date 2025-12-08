@@ -81,14 +81,14 @@ export const TaskListSidebar = ({ selectedListId, onSelectList }) => {
 
   if (isLoading) {
     return (
-      <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
+      <div className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
         <div className="text-gray-500 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
+    <div className="bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">My Lists</h2>
         <Button

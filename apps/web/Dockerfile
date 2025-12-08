@@ -40,8 +40,8 @@ FROM nginx:alpine AS runner
 # Copy built assets to nginx
 COPY --from=installer /app/apps/web/dist /usr/share/nginx/html
 
-# Copy nginx configuration if you have one
-# COPY --from=installer /app/apps/web/nginx.conf /etc/nginx/nginx.conf
+# Copy nginx configuration
+COPY --from=installer /app/apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80

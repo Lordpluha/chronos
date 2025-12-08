@@ -29,7 +29,7 @@ services:
       - FRONT_HOST=${FRONT_HOST:-localhost}
       - FRONT_PORT=${FRONT_PORT:-5173}
       # MongoDB - используем локальную БД в Docker
-      - MONGODB_URI=mongodb://admin:admin_password@mongodb:27017/chronos?authSource=admin
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin_password}@mongodb:27017/${DB_NAME:-chronos}?authSource=admin
       - DB_NAME=${DB_NAME:-chronos}
       - JWT_SECRET=${JWT_SECRET}
       - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
@@ -55,15 +55,33 @@ services:
     image: mongo:7.0
     restart: always
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=admin_password
-      - MONGO_INITDB_DATABASE=chronos
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-admin_password}
+      - MONGO_INITDB_DATABASE=${DB_NAME:-chronos}
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongodb_data:/data/db
     networks:
       - app_network
+
+  # MongoDB Admin UI
+  mongo-express:
+    container_name: chronos-mongo-admin
+    image: mongo-express:latest
+    restart: always
+    ports:
+      - "${MONGO_EXPRESS_PORT:-8081}:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=${MONGO_ROOT_PASSWORD:-admin_password}
+      - ME_CONFIG_MONGODB_URL=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-admin_password}@mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGO_EXPRESS_USERNAME:-admin}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGO_EXPRESS_PASSWORD:-admin}
+    networks:
+      - app_network
+    depends_on:
+      - mongodb
 
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
