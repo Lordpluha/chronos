@@ -1,8 +1,6 @@
 import { z } from 'zod'
 
-/**
- * Создает общие схемы валидации
- */
+
 function createCommonSchemas() {
   return {
     portSchema: z
@@ -27,9 +25,7 @@ function createCommonSchemas() {
   }
 }
 
-/**
- * Схема для настроек приложения
- */
+
 export function getAppSchema() {
   const { portSchema } = createCommonSchemas()
 
@@ -50,9 +46,7 @@ export function getAppSchema() {
   })
 }
 
-/**
- * Схема для настроек базы данных
- */
+
 export function getDatabaseSchema() {
   const { urlSchema } = createCommonSchemas()
 
@@ -66,9 +60,6 @@ export function getDatabaseSchema() {
   })
 }
 
-/**
- * Схема для JWT настроек
- */
 export function getJwtSchema() {
   const { secretSchema, lifetimeSchema } = createCommonSchemas()
 
@@ -87,13 +78,9 @@ export function getJwtSchema() {
   })
 }
 
-/**
- * Схема для email настроек
- */
 export function getEmailSchema() {
   const { lifetimeSchema } = createCommonSchemas()
 
-  // Специальная схема для SMTP портов (может быть меньше 1000)
   const smtpPortSchema = z
     .string()
     .regex(/^\d+$/, 'SMTP port must be a number')
@@ -111,9 +98,7 @@ export function getEmailSchema() {
   })
 }
 
-/**
- * Схема для OAuth настроек
- */
+
 export function getOAuthSchema() {
   const { urlSchema } = createCommonSchemas()
 
@@ -124,9 +109,7 @@ export function getOAuthSchema() {
   })
 }
 
-/**
- * Получает все схемы валидации
- */
+
 export function getAllSchemas() {
   return {
     app: getAppSchema(),

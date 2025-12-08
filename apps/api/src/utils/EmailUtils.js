@@ -8,7 +8,7 @@ export class EmailUtilsClass {
         ...props,
       })
       .then((onsuccess) => {
-        console.log('Message sent: %s', onsuccess.messageId)
+
       })
   }
 
@@ -23,6 +23,90 @@ export class EmailUtilsClass {
         <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
         <p style="font-size:0.9em;color:#888;text-align:center;">If you did not request a password reset, simply ignore this email.</p>
         <p style="font-size:0.9em;color:#888;text-align:center;">USOF &copy; ${new Date().getFullYear()}</p>
+      </div>
+    `
+  }
+
+  generateCalendarShareEmail(ownerName, calendarTitle, permission, calendarId) {
+    const permissionText = {
+      read: 'view',
+      write: 'edit',
+      admin: 'manage'
+    }[permission] || 'view';
+
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:24px;border-radius:8px;background:#f9f9f9;border:1px solid #eee;">
+        <h2 style="color:#6366f1;text-align:center;">📅 Calendar Invitation</h2>
+        <p>Hello!</p>
+        <p><strong>${ownerName}</strong> has invited you to join a calendar on Chronos.</p>
+
+        <div style="background:#fff;padding:16px;border-radius:6px;margin:16px 0;border-left:4px solid #6366f1;">
+          <p style="margin:0;font-size:1.1em;font-weight:bold;color:#333;">${calendarTitle}</p>
+          <p style="margin:8px 0 0 0;color:#666;">Permission: <strong>${permissionText}</strong></p>
+        </div>
+
+        <p>Click the button below to accept this invitation and add the calendar to your account.</p>
+
+        <div style="text-align:center;margin:24px 0;">
+          <a href="http://localhost:5173/calendar?calendar=${calendarId}&action=accept"
+             style="display:inline-block;padding:12px 32px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+            ✓ Accept Invitation
+          </a>
+        </div>
+
+        <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+        <p style="font-size:0.9em;color:#888;text-align:center;">Chronos - Your Time, Organized</p>
+        <p style="font-size:0.9em;color:#888;text-align:center;">&copy; ${new Date().getFullYear()}</p>
+      </div>
+    `
+  }
+
+  generateEventInviteEmail(organizerName, eventTitle, eventStart, eventEnd, role, eventId) {
+    const roleText = {
+      owner: 'Owner',
+      admin: 'Admin',
+      viewer: 'Viewer'
+    }[role] || 'Viewer';
+
+    const startDate = new Date(eventStart).toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:500px;margin:auto;padding:24px;border-radius:8px;background:#f9f9f9;border:1px solid #eee;">
+        <h2 style="color:#6366f1;text-align:center;">📆 Event Invitation</h2>
+        <p>Hello!</p>
+        <p><strong>${organizerName}</strong> has invited you to an event on Chronos.</p>
+
+        <div style="background:#fff;padding:20px;border-radius:8px;margin:20px 0;border-left:4px solid #6366f1;">
+          <h3 style="margin:0 0 12px 0;color:#333;font-size:1.3em;">${eventTitle}</h3>
+          <p style="margin:8px 0;color:#666;">
+            <strong>📅 When:</strong> ${startDate}
+          </p>
+          <p style="margin:8px 0;color:#666;">
+            <strong>👤 Your role:</strong> ${roleText}
+          </p>
+        </div>
+
+        <div style="text-align:center;margin:24px 0;">
+          <a href="http://localhost:5173/calendar?event=${eventId}&action=accept"
+             style="display:inline-block;padding:12px 32px;background:#10b981;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;margin-right:8px;">
+            ✓ Accept
+          </a>
+          <a href="http://localhost:5173/calendar?event=${eventId}"
+             style="display:inline-block;padding:12px 32px;background:#6b7280;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">
+            View Details
+          </a>
+        </div>
+
+        <hr style="margin:24px 0;border:none;border-top:1px solid #eee;">
+        <p style="font-size:0.9em;color:#888;text-align:center;">Chronos - Your Time, Organized</p>
+        <p style="font-size:0.9em;color:#888;text-align:center;">&copy; ${new Date().getFullYear()}</p>
       </div>
     `
   }

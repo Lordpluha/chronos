@@ -19,9 +19,9 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
-        register: "bg-landing-register text-white hover:bg-landing-register-hover",
-        login: "text-landing-login hover:text-landing-login-hover hover:bg-accent",
-        primary: "bg-landing-btn-primary text-white hover:bg-landing-btn-primary-hover rounded-full",
+        register: "bg-landing-register text-white hover:bg-landing-register-hover dark:bg-blue-600 dark:hover:bg-blue-700",
+        login: "text-landing-login hover:text-landing-login-hover hover:bg-accent dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700/50",
+        primary: "bg-landing-btn-primary text-white hover:bg-landing-btn-primary-hover rounded-full dark:bg-blue-600 dark:hover:bg-blue-700",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

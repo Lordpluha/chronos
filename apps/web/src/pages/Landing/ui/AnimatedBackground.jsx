@@ -2,40 +2,40 @@ import { OrbitingCircles } from "@shared/ui/orbiting-circles";
 
 const Icons = {
   icon1: () => (
-    <img src="/land-orbit-icon-1.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-1.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon2: () => (
-    <img src="/land-orbit-icon-2.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-2.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon3: () => (
-    <img src="/land-orbit-icon-3.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-3.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon4: () => (
-    <img src="/land-orbit-icon-4.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-4.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon5: () => (
-    <img src="/land-orbit-icon-5.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-5.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon6: () => (
-    <img src="/land-orbit-icon-6.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-6.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon7: () => (
-    <img src="/land-orbit-icon-7.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-7.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon8: () => (
-    <img src="/land-orbit-icon-8.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-8.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon9: () => (
-    <img src="/land-orbit-icon-9.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-9.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon10: () => (
-    <img src="/land-orbit-icon-10.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-10.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon11: () => (
-    <img src="/land-orbit-icon-11.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-11.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
   icon13: () => (
-    <img src="/land-orbit-icon-13.svg" alt="" className="w-full h-full" />
+    <img src="/land-orbit-icon-13.svg" alt="" className="w-full h-full dark:brightness-90 dark:contrast-125" />
   ),
 };
 

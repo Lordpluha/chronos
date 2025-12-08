@@ -23,13 +23,13 @@ services:
     env_file:
       - ./apps/api/.env.local
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=${NODE_ENV:-development}
       - BACK_PORT=${BACK_PORT:-3001}
       - BACK_HOST=${BACK_HOST:-0.0.0.0}
       - FRONT_HOST=${FRONT_HOST:-localhost}
-      - FRONT_PORT=${FRONT_PORT:-3000}
-      # MongoDB Atlas URI (production) or local MongoDB (development)
-      - MONGODB_URI=${MONGODB_URI}
+      - FRONT_PORT=${FRONT_PORT:-5173}
+      # MongoDB - используем локальную БД в Docker
+      - MONGODB_URI=mongodb://admin:admin_password@mongodb:27017/chronos?authSource=admin
       - DB_NAME=${DB_NAME:-chronos}
       - JWT_SECRET=${JWT_SECRET}
       - ACCESS_TOKEN_LIFETIME=${ACCESS_TOKEN_LIFETIME:-15m}
@@ -46,27 +46,24 @@ services:
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
     networks:
       - app_network
+    depends_on:
+      - mongodb
 
-  # Local MongoDB for development only
-  # In production, this service is not used (Atlas is used instead)
+  # Local MongoDB for development
   mongodb:
     container_name: chronos-mongodb
     image: mongo:7.0
     restart: always
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-admin_password}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-chronos}
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin_password
+      - MONGO_INITDB_DATABASE=chronos
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-      # Optional: Only mount if you want to create initial users/collections
-      # - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - app_network
-    profiles:
-      - development  # Only start in development profile
 
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname

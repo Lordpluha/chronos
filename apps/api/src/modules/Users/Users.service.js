@@ -141,6 +141,70 @@ class UsersService {
       lastLoginAt: user.lastLoginAt,
     }
   }
+
+  /**
+   * Обновление аватара пользователя
+   * @param {string} userId - ID пользователя
+   * @param {string} avatarUrl - URL или путь к аватару
+   * @returns {Promise<Object>} Обновленные данные пользователя
+   */
+  async updateAvatar(userId, avatarUrl) {
+    const user = await User.findById(userId)
+    if (!user) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    user.avatar = avatarUrl
+    await user.save()
+
+    return {
+      id: user._id,
+      login: user.login,
+      email: user.email,
+      full_name: user.full_name,
+      avatar: user.avatar,
+      is_email_verified: user.is_email_verified,
+      google_id: user.google_id,
+      twoFactorEnabled: user.twoFactorEnabled,
+      created: user.created,
+      updated: user.updated,
+    }
+  }
+
+  /**
+   * Удаление аккаунта пользователя
+   * @param {string} userId - ID пользователя
+   * @param {string} password - Пароль для подтверждения
+   * @returns {Promise<void>}
+   */
+  async deleteAccount(userId, password) {
+    const user = await User.findById(userId)
+    if (!user) {
+      const error = new Error('User not found')
+      error.status = 404
+      throw error
+    }
+
+    // Если у пользователя есть пароль (не OAuth), требуем подтверждение
+    if (user.password_hash && !user.google_id) {
+      if (!password) {
+        const error = new Error('Password is required to delete account')
+        error.status = 400
+        throw error
+      }
+
+      const isPasswordValid = await user.checkPassword(password)
+      if (!isPasswordValid) {
+        const error = new Error('Invalid password')
+        error.status = 401
+        throw error
+      }
+    }
+
+    await User.findByIdAndDelete(userId)
+  }
 }
 
 export const usersService = new UsersService()

@@ -1,10 +1,18 @@
 import dayjs from "dayjs";
 
-export function getMonth(month = dayjs().month()) {
+export function getMonth(month = dayjs().month(), weekStartsOn = 'monday') {
   month = Math.floor(month)
 	const year = dayjs().year();
 	const firstDayOfTheMonth = dayjs(new Date(year, month, 1)).day();
-	let currentMonthCount = 0 - (firstDayOfTheMonth === 0 ? 6 : firstDayOfTheMonth - 1);
+
+	let offset;
+	if (weekStartsOn === 'sunday') {
+		offset = firstDayOfTheMonth;
+	} else {
+		offset = firstDayOfTheMonth === 0 ? 6 : firstDayOfTheMonth - 1;
+	}
+
+	let currentMonthCount = 0 - offset;
 
 	const daysMatrix = new Array(5).fill([]).map(() => {
 		return new Array(7).fill(null).map(() => {

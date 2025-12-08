@@ -65,8 +65,8 @@ const calendarSchema = new mongoose.Schema(
         },
         permission: {
           type: String,
-          enum: ['read', 'write', 'admin'],
-          default: 'read',
+          enum: ['viewer', 'admin', 'owner', 'read', 'write'],
+          default: 'viewer',
         },
         shared_at: {
           type: Date,
@@ -131,7 +131,6 @@ const calendarSchema = new mongoose.Schema(
       hasAccess(userId, requiredPermission = 'read') {
         const userIdStr = userId.toString()
 
-        // Безопасное получение ID владельца и создателя
         const ownerId = this.owner?._id ? this.owner._id.toString() : this.owner.toString()
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
 
@@ -185,6 +184,9 @@ const calendarSchema = new mongoose.Schema(
             : shareUser.toString()
           return shareUserId !== userIdStr
         })
+      },
+      updateSharedPermission(userId, permission) {
+        return this.shareWith(userId, permission)
       },
       addEvent(eventId) {
         const id = /** @type {import('mongoose').Types.ObjectId} */ (eventId)

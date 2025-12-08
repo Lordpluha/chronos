@@ -126,8 +126,18 @@ const eventSchema = new mongoose.Schema(
         responded_at: {
           type: Date,
         },
+        pending_role: {
+          type: String,
+          enum: ['owner', 'admin', 'viewer'],
+        },
       },
     ],
+    label: {
+      type: String,
+      enum: ['indigo', 'gray', 'green', 'blue', 'red', 'purple'],
+      default: 'indigo',
+      trim: true,
+    },
     recurrence: {
       type: {
         frequency: {
@@ -221,7 +231,9 @@ const eventSchema = new mongoose.Schema(
           query.where('start', dateFilter)
         }
 
-        return query.populate('creator organizer calendar')
+        return query
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**
@@ -229,9 +241,9 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       findByCreator(creatorId) {
-        return this.find({ creator: creatorId }).populate(
-          'creator organizer calendar',
-        )
+        return this.find({ creator: creatorId })
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**
@@ -239,9 +251,9 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       findByOrganizer(organizerId) {
-        return this.find({ organizer: organizerId }).populate(
-          'creator organizer calendar',
-        )
+        return this.find({ organizer: organizerId })
+          .populate('creator organizer calendar')
+          .populate('attendees.user')
       },
 
       /**
@@ -293,14 +305,11 @@ const eventSchema = new mongoose.Schema(
        * @this {import('./Event').IEventModel}
        */
       async findWithRecurrence(calendarId, startDate, endDate) {
-        // Находим базовые события (не экземпляры повторений)
         const events = await this.find({
           calendar: calendarId,
           recurrence_id: null,
           $or: [
-            // Обычные события в диапазоне
             { is_recurring: false, start: { $gte: startDate, $lte: endDate } },
-            // Повторяющиеся события, которые начались до конца периода
             { is_recurring: true, start: { $lte: endDate } },
           ],
         }).populate('creator organizer calendar')
@@ -315,7 +324,6 @@ const eventSchema = new mongoose.Schema(
       hasAccess(userId) {
         const userIdStr = userId.toString()
 
-        // Безопасное получение ID создателя и организатора
         const creatorId = this.creator?._id ? this.creator._id.toString() : this.creator.toString()
         const organizerId = this.organizer?._id ? this.organizer._id.toString() : this.organizer.toString()
 
@@ -338,8 +346,9 @@ const eventSchema = new mongoose.Schema(
       /**
        * @param {import('mongoose').Types.ObjectId | string} userIdOrEmail
        * @param {boolean} [isUser=true]
+       * @param {string} [role='participant'] - Role не сохраняется в attendees (управляется через Access)
        */
-      addAttendee(userIdOrEmail, isUser = true) {
+      addAttendee(userIdOrEmail, isUser = true, role = 'participant') {
         const existingIndex = this.attendees.findIndex((attendee) => {
           if (isUser && attendee.user) {
             const attendeeUser = attendee.user
@@ -356,9 +365,9 @@ const eventSchema = new mongoose.Schema(
           let attendeeData
 
           if (isUser) {
-            attendeeData = { user: userIdOrEmail, status: 'invited', invited_at: new Date() }
+            attendeeData = { user: userIdOrEmail, status: 'invited', invited_at: new Date(), pending_role: role }
           } else {
-            attendeeData = { email: /** @type {string} */ (userIdOrEmail), status: 'invited', invited_at: new Date() }
+            attendeeData = { email: /** @type {string} */ (userIdOrEmail), status: 'invited', invited_at: new Date(), pending_role: role }
           }
 
           this.attendees.push(attendeeData)
@@ -432,14 +441,12 @@ const eventSchema = new mongoose.Schema(
             occurrenceCount++
           }
 
-          // Увеличиваем дату в зависимости от частоты
           switch (frequency) {
             case 'daily':
               current.setDate(current.getDate() + interval)
               break
             case 'weekly':
               if (byWeekday && byWeekday.length > 0) {
-                // Находим следующий день недели из списка
                 let found = false
                 for (let i = 1; i <= 7; i++) {
                   const nextDay = new Date(current)
@@ -471,21 +478,18 @@ const eventSchema = new mongoose.Schema(
               break
           }
 
-          // Защита от бесконечного цикла
           if (occurrenceCount > maxOccurrences) break
         }
 
         return occurrences
       },
       /**
-       * Проверяет, является ли это мастер-событие (базовое повторяющееся)
        * @returns {boolean}
        */
       isMasterEvent() {
         return this.is_recurring && !this.recurrence_id
       },
       /**
-       * Проверяет, является ли это экземпляр повторяющегося события
        * @returns {boolean}
        */
       isRecurrenceInstance() {

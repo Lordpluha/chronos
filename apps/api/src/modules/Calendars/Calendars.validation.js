@@ -21,11 +21,16 @@ export const updateCalendarSchema = z.object({
 
 export const shareCalendarSchema = z.object({
   userEmail: z.string().email('Invalid email format'),
-  permission: z.enum(['read', 'write', 'admin']).default('read'),
+  permission: z.enum(['viewer', 'admin', 'owner', 'read', 'write']).default('viewer'), // Поддержка старых и новых значений
 })
 
 export const removeAccessSchema = z.object({
   userEmail: z.string().email('Invalid email format'),
+})
+
+export const updateAccessSchema = z.object({
+  userEmail: z.string().email('Invalid email format'),
+  permission: z.enum(['viewer', 'admin', 'owner', 'read', 'write']), // Поддержка старых и новых значений
 })
 
 // Валидация для событий
@@ -64,6 +69,7 @@ export const createEventSchema = z.object({
   time_zone: z.string().trim().optional(),
   start: z.string().or(z.date()).transform((val) => new Date(val)),
   end: z.string().or(z.date()).transform((val) => new Date(val)),
+  label: z.enum(['indigo', 'gray', 'green', 'blue', 'red', 'purple']).default('indigo'),
   location: z.object({
     name: z.string().trim().max(500).optional(),
     address: z.string().trim().max(500).optional(),
@@ -92,6 +98,7 @@ export const updateEventSchema = z.object({
   time_zone: z.string().trim().optional(),
   start: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
   end: z.string().or(z.date()).transform((val) => new Date(val)).optional(),
+  label: z.enum(['indigo', 'gray', 'green', 'blue', 'red', 'purple']).optional(),
   location: z.object({
     name: z.string().trim().max(500).optional(),
     address: z.string().trim().max(500).optional(),
@@ -104,18 +111,22 @@ export const updateEventSchema = z.object({
   is_all_day: z.boolean().optional(),
   status: z.enum(['confirmed', 'tentative', 'cancelled']).optional(),
   recurrence: recurrenceSchema.optional().nullable(),
+  calendar_id: z.string().optional(), // Для перемещения события в другой календарь
 })
 
 export const addAttendeeSchema = z.object({
   user_id: z.string().optional(),
   email: z.string().email().optional(),
-}).refine((data) => data.user_id || data.email, {
-  message: 'Either user_id or email is required',
-  path: ['user_id'],
+  role: z.enum(['owner', 'admin', 'viewer']).optional().default('viewer'),
 })
+// Removed refine - allow self-subscription when neither user_id nor email provided
 
 export const updateAttendeeStatusSchema = z.object({
   status: z.enum(['invited', 'accepted', 'declined', 'maybe']),
+})
+
+export const updateAttendeeRoleSchema = z.object({
+  role: z.enum(['owner', 'admin', 'viewer']),
 })
 
 // Валидация для напоминаний

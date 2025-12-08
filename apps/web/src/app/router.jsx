@@ -4,7 +4,10 @@ import { Registration } from '@pages/Registration'
 import { ForgotPassword } from '@pages/ForgotPassword'
 import { ResetPassword } from '@pages/ResetPassword'
 import { ProfilePage } from '@pages/Profile'
+import { AccountPage } from '@pages/AccountPage'
 import { CalendarPage } from '@pages/Calendar'
+import { RemindersPage } from '@pages/RemindersPage'
+import { TasksPage } from '@pages/TasksPage'
 import { ROUTES } from '@shared/routes'
 import { GuestRoute, PrivateRoute } from '@shared/components/ProtectedRoute'
 import { createBrowserRouter } from 'react-router'
@@ -55,10 +58,34 @@ export const router = createBrowserRouter([
     ),
   },
   {
+    path: ROUTES.account,
+    element: (
+      <PrivateRoute>
+        <AccountPage />
+      </PrivateRoute>
+    ),
+  },
+  {
     path: ROUTES.calendar,
     element: (
       <PrivateRoute>
         <CalendarPage />
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: ROUTES.reminders,
+    element: (
+      <PrivateRoute>
+        <RemindersPage />
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: ROUTES.tasks,
+    element: (
+      <PrivateRoute>
+        <TasksPage />
       </PrivateRoute>
     ),
   },

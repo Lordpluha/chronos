@@ -145,6 +145,8 @@ class RemindersService {
     if (data.description !== undefined) reminder.description = data.description
     if (data.time_zone !== undefined) reminder.time_zone = data.time_zone
     if (data.start !== undefined) reminder.start = new Date(data.start)
+    if (data.completed !== undefined) reminder.completed = data.completed
+    if (data.completed_at !== undefined) reminder.completed_at = data.completed_at ? new Date(data.completed_at) : null
 
     await reminder.save()
     return reminder

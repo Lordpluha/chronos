@@ -9,10 +9,12 @@ import {
   updateCalendarSchema,
   shareCalendarSchema,
   removeAccessSchema,
+  updateAccessSchema,
   createEventSchema,
   updateEventSchema,
   addAttendeeSchema,
   updateAttendeeStatusSchema,
+  updateAttendeeRoleSchema,
   createReminderSchema,
   updateReminderSchema,
   shareReminderSchema,
@@ -127,6 +129,27 @@ router.post(
   },
 )
 
+// POST /calendars/:calendarId/accept - принять приглашение в календарь
+router.post(
+  '/calendars/:calendarId/accept',
+  requireAccessToken,
+  async (req, res) => {
+    try {
+      const calendar = await calendarsService.acceptCalendarInvitation(
+        req.params.calendarId,
+        req.userId,
+      )
+      return res.json({
+        message: 'Calendar invitation accepted',
+        calendar,
+      })
+    } catch (err) {
+      console.error('❌ Error accepting calendar invitation:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
 // DELETE /calendars/:calendarId/share - удалить доступ к календарю
 router.delete(
   '/calendars/:calendarId/share',
@@ -145,6 +168,52 @@ router.delete(
       })
     } catch (err) {
       console.error('❌ Error removing calendar access:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PATCH /calendars/:calendarId/share - обновить права доступа к календарю
+router.patch(
+  '/calendars/:calendarId/share',
+  requireAccessToken,
+  validateBody(updateAccessSchema),
+  async (req, res) => {
+    try {
+      const calendar = await calendarsService.updateCalendarAccess(
+        req.params.calendarId,
+        req.userId,
+        req.body,
+      )
+      return res.json({
+        message: 'Calendar access updated successfully',
+        calendar,
+      })
+    } catch (err) {
+      console.error('❌ Error updating calendar access:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// POST /calendars/:calendarId/subscribe - подписаться на календарь через публичную ссылку
+router.post(
+  '/calendars/:calendarId/subscribe',
+  requireAccessToken,
+  validateBody(addAttendeeSchema), // Используем ту же схему что и для событий
+  async (req, res) => {
+    try {
+      const calendar = await calendarsService.subscribeToCalendar(
+        req.params.calendarId,
+        req.userId,
+        req.body,
+      )
+      return res.json({
+        message: 'Successfully subscribed to calendar',
+        calendar,
+      })
+    } catch (err) {
+      console.error('❌ Error subscribing to calendar:', err)
       return res.status(err.status || 500).json({ message: err.message })
     }
   },
@@ -277,12 +346,37 @@ router.patch(
         req.userId,
         req.body.status,
       )
+
       return res.json({
         message: 'Attendee status updated successfully',
         event,
       })
     } catch (err) {
       console.error('❌ Error updating attendee status:', err)
+      return res.status(err.status || 500).json({ message: err.message })
+    }
+  },
+)
+
+// PATCH /events/:eventId/attendees/:attendeeId/role - обновить роль участника
+router.patch(
+  '/events/:eventId/attendees/:attendeeId/role',
+  requireAccessToken,
+  validateBody(updateAttendeeRoleSchema),
+  async (req, res) => {
+    try {
+      const event = await eventsService.updateAttendeeRole(
+        req.params.eventId,
+        req.userId,
+        req.params.attendeeId,
+        req.body.role,
+      )
+      return res.json({
+        message: 'Attendee role updated successfully',
+        event,
+      })
+    } catch (err) {
+      console.error('❌ Error updating attendee role:', err)
       return res.status(err.status || 500).json({ message: err.message })
     }
   },

@@ -15,6 +15,7 @@ export function RegistrationFields({ register, errors, isLoading }) {
           type="text"
           placeholder="john_doe"
           disabled={isLoading}
+          aria-invalid={!!errors.login}
           {...register("login")}
         />
         {errors.login && <FieldError>{errors.login.message}</FieldError>}
@@ -26,6 +27,7 @@ export function RegistrationFields({ register, errors, isLoading }) {
           type="text"
           placeholder="John Doe"
           disabled={isLoading}
+          aria-invalid={!!errors.full_name}
           {...register("full_name")}
         />
         {errors.full_name && <FieldError>{errors.full_name.message}</FieldError>}
@@ -37,6 +39,7 @@ export function RegistrationFields({ register, errors, isLoading }) {
           type="email"
           placeholder="m@example.com"
           disabled={isLoading}
+          aria-invalid={!!errors.email}
           {...register("email")}
         />
         {errors.email && <FieldError>{errors.email.message}</FieldError>}
@@ -48,6 +51,7 @@ export function RegistrationFields({ register, errors, isLoading }) {
             id="password"
             type={showPassword ? "text" : "password"}
             disabled={isLoading}
+            aria-invalid={!!errors.password}
             {...register("password")}
           />
           <button
@@ -57,9 +61,9 @@ export function RegistrationFields({ register, errors, isLoading }) {
             onClick={() => setShowPassword((v) => !v)}
           >
             {showPassword ? (
-              <img src="/eye-icon-close.svg" alt="" />
+              <img src="/eye-icon-close.svg" alt="" className="dark:invert" />
             ) : (
-              <img src="/eye-icon.svg" alt="" />
+              <img src="/eye-icon.svg" alt="" className="dark:invert" />
             )}
           </button>
         </div>
@@ -74,6 +78,7 @@ export function RegistrationFields({ register, errors, isLoading }) {
             id="confirm-password"
             type={showConfirmPassword ? "text" : "password"}
             disabled={isLoading}
+            aria-invalid={!!errors.confirmPassword}
             {...register("confirmPassword")}
           />
           <button
@@ -83,9 +88,9 @@ export function RegistrationFields({ register, errors, isLoading }) {
             onClick={() => setShowConfirmPassword((v) => !v)}
           >
             {showConfirmPassword ? (
-              <img src="/eye-icon-close.svg" alt="" />
+              <img src="/eye-icon-close.svg" alt="" className="dark:invert" />
             ) : (
-              <img src="/eye-icon.svg" alt="" />
+              <img src="/eye-icon.svg" alt="" className="dark:invert" />
             )}
           </button>
         </div>

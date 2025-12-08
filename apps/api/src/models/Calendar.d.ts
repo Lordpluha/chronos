@@ -27,6 +27,7 @@ export interface ICalendarMethods {
   hasAccess(userId: Types.ObjectId | string, requiredPermission?: 'read' | 'write' | 'admin'): boolean
   shareWith(userId: Types.ObjectId | string, permission?: 'read' | 'write' | 'admin'): void
   removeSharedAccess(userId: Types.ObjectId | string): void
+  updateSharedPermission(userId: Types.ObjectId | string, permission: 'read' | 'write' | 'admin'): void
   addEvent(eventId: Types.ObjectId | string): void
   removeEvent(eventId: Types.ObjectId | string): void
   addReminder(reminderId: Types.ObjectId | string): void

@@ -14,6 +14,8 @@ export interface IReminder {
   calendar: Types.ObjectId
   start: Date
   time_zone: string
+  completed: boolean
+  completed_at: Date | null
   shared_with: ISharedWith[]
   created: Date
   updated: Date

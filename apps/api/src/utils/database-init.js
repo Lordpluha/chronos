@@ -14,7 +14,7 @@ import { RegistrationTotp } from '../models/RegistrationTotp.js'
  */
 export async function initializeDatabase() {
   try {
-    console.log('🔧 Initializing database indexes...')
+
 
     // Ensure indexes exist for all models
     await Calendar.ensureIndexes()
@@ -32,14 +32,14 @@ export async function initializeDatabase() {
       if (sessionError.code !== 85 && sessionError.code !== 86) {
         throw sessionError
       }
-      console.log('ℹ️  Session indexes already exist (skipping)')
+
     }
 
     await Task.ensureIndexes()
     await TaskList.ensureIndexes()
     await User.ensureIndexes()
 
-    console.log('✅ Database indexes initialized successfully')
+
   } catch (error) {
     console.error('❌ Error initializing database indexes:', error)
     // Don't throw error - indexes might already exist

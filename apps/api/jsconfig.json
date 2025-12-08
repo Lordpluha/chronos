@@ -1,11 +1,9 @@
 {
   "compilerOptions": {
-    // Модульная система
     "module": "ESNext",
     "moduleResolution": "Node",
     "target": "ES2022",
 
-    // Разрешение путей
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
@@ -18,38 +16,30 @@
       "@messages/*": ["src/messages/*"]
     },
 
-    // Проверки типов
     "checkJs": true,
     "allowJs": true,
     "noEmit": true,
     "skipLibCheck": true,
 
-    // Строгость
     "strict": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
 
-    // Импорты
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
 
-    // Дополнительные проверки
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true,
 
-    // Совместимость с библиотеками
     "lib": ["ES2022"],
     "types": ["node"],
 
-    // Декораторы (если понадобятся)
     "experimentalDecorators": false,
     "emitDecoratorMetadata": false,
-
-    // Source maps для отладки
     "sourceMap": false,
     "declaration": false
   },

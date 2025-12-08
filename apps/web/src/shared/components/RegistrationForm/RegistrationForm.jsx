@@ -5,7 +5,7 @@ import { z } from "zod";
 import toast from "react-hot-toast";
 import { cn } from "@shared/lib/utils";
 import { Button } from "@shared/ui/button";
-import { Field, FieldGroup } from "@shared/ui/field";
+import { Field, FieldGroup, FieldError } from "@shared/ui/field";
 import { ROUTES } from "@shared/routes";
 import { useNavigate } from "react-router";
 import { useAuth } from "@shared/context/AuthContext";
@@ -34,11 +34,7 @@ const registrationSchema = z
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
-      .max(128, "Password must be less than 128 characters")
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        "Password must contain at least one lowercase letter, one uppercase letter, and one number"
-      ),
+      .max(128, "Password must be less than 128 characters"),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -56,8 +52,11 @@ export function RegistrationForm({ className, ...props }) {
     register,
     handleSubmit,
     formState: { errors },
+    setError,
   } = useForm({
     resolver: zodResolver(registrationSchema),
+    mode: "onBlur", // Validate on blur (when user leaves the field)
+    reValidateMode: "onChange", // Re-validate on change after first submit
   });
 
   const onSubmit = async (data) => {
@@ -74,10 +73,75 @@ export function RegistrationForm({ className, ...props }) {
       console.error("Registration error:", error);
 
       if (error.response?.status === 409) {
-        toast.error("User with this email or login already exists");
+        // User already exists - conflict
+        const errorData = error.response?.data;
+        const message = errorData?.message || "User with this email or username already exists";
+
+        // Try to identify which field caused the conflict
+        if (message.toLowerCase().includes('email')) {
+          setError("email", {
+            type: "manual",
+            message: "This email is already registered",
+          });
+          toast.error("This email is already registered");
+        } else if (message.toLowerCase().includes('login') || message.toLowerCase().includes('username')) {
+          setError("login", {
+            type: "manual",
+            message: "This username is already taken",
+          });
+          toast.error("This username is already taken");
+        } else {
+          setError("root", {
+            type: "manual",
+            message: message,
+          });
+          toast.error(message);
+        }
+      } else if (error.response?.status === 400) {
+        // Validation errors from backend
+        const errorData = error.response?.data;
+
+        // Check if we have field-specific errors
+        if (errorData?.errors && typeof errorData.errors === 'object') {
+          // Set errors for each field
+          Object.keys(errorData.errors).forEach((field) => {
+            const fieldErrors = errorData.errors[field];
+            const errorMessage = Array.isArray(fieldErrors)
+              ? fieldErrors.join(', ')
+              : fieldErrors;
+
+            setError(field, {
+              type: "manual",
+              message: errorMessage,
+            });
+          });
+
+          // Show first error in toast
+          const firstError = Object.values(errorData.errors)[0];
+          const firstErrorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+          toast.error(firstErrorMessage);
+        } else {
+          // General validation error
+          const message = errorData?.message || "Invalid input. Please check all fields.";
+          setError("root", {
+            type: "manual",
+            message: message,
+          });
+          toast.error(message);
+        }
       } else if (error.response?.data?.message) {
+        // Any other error with a message
+        setError("root", {
+          type: "manual",
+          message: error.response.data.message,
+        });
         toast.error(error.response.data.message);
       } else {
+        // Generic error
+        setError("root", {
+          type: "manual",
+          message: "Registration failed. Please check your connection and try again.",
+        });
         toast.error("Registration failed. Please try again.");
       }
     } finally {
@@ -98,6 +162,9 @@ export function RegistrationForm({ className, ...props }) {
           errors={errors}
           isLoading={isLoading}
         />
+        {errors.root && (
+          <FieldError className="text-center">{errors.root.message}</FieldError>
+        )}
         <Field>
           <Button type="submit" disabled={isLoading}>
             {isLoading ? "Creating account..." : "Sign up"}

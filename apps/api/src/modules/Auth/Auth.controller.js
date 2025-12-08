@@ -124,20 +124,17 @@ router.post(
   },
 )
 
-// Google OAuth routes
 router.get('/auth/google', async (req, res) => {
   try {
     console.log('🚀 Initiating Google OAuth...')
 
-    // Генерируем state для защиты от CSRF
     const state = Math.random().toString(36).substring(2, 15)
     console.log('🔐 Generated state:', state)
 
-    // Сохраняем state в cookie для проверки в callback
     res.cookie('oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 10 * 60 * 1000, // 10 минут
+      maxAge: 10 * 60 * 1000,
       sameSite: 'lax',
     })
 
@@ -165,13 +162,11 @@ router.get('/auth/google/callback', async (req, res) => {
     console.log('  Error:', error)
     console.log('  Request URL:', req.originalUrl)
 
-    // Проверяем наличие ошибки от Google
     if (error) {
       console.log('❌ Google OAuth error:', error)
       return res.status(400).json({ message: `Google OAuth error: ${error}` })
     }
 
-    // Проверяем наличие кода
     if (!code) {
       console.log('❌ Authorization code not provided')
       return res
@@ -179,7 +174,6 @@ router.get('/auth/google/callback', async (req, res) => {
         .json({ message: 'Authorization code not provided' })
     }
 
-    // Проверяем, не был ли код уже использован
     const isUsed = await UsedOAuthCode.isCodeUsed(code)
     if (isUsed) {
       console.log('❌ Authorization code has already been used')
@@ -188,21 +182,17 @@ router.get('/auth/google/callback', async (req, res) => {
         .json({ message: 'Authorization code has already been used' })
     }
 
-    // Добавляем код в список использованных (истекает через 10 минут)
     await UsedOAuthCode.markAsUsed(code, 10)
 
     console.log('🔄 Processing Google OAuth callback...')
 
-    // Обрабатываем callback и получаем токены
     const { ipAddress, deviceInfo } = DeviceUtils.getRequestInfo(req)
 
     const { access_token, refresh_token } =
       await authService.handleGoogleCallback(code, state, ipAddress, deviceInfo)
 
-    // Устанавливаем токены в cookies
     res = JWTUtils.generateHttpOnlyCookie(res, access_token, refresh_token)
 
-    // Перенаправляем на фронтенд
     const frontendUrl =
       process.env.NODE_ENV === 'production'
         ? `https://${process.env.FRONT_HOST}`
@@ -216,7 +206,6 @@ router.get('/auth/google/callback', async (req, res) => {
   } catch (err) {
     console.error('❌ Google OAuth callback error:', err)
 
-    // Удаляем код из использованных, если произошла ошибка
     if (req.query.code) {
       await UsedOAuthCode.deleteOne({ code: req.query.code })
     }
@@ -232,7 +221,6 @@ router.get('/auth/google/callback', async (req, res) => {
   }
 })
 
-// GET /auth/me - получить информацию о текущем пользователе
 router.get('/auth/me', requireAccessToken, async (req, res) => {
   try {
     const userId = req.userId
@@ -242,7 +230,6 @@ router.get('/auth/me', requireAccessToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' })
     }
 
-    // Возвращаем информацию о пользователе без пароля
     const userInfo = {
       id: user.id,
       login: user.login,
@@ -263,9 +250,6 @@ router.get('/auth/me', requireAccessToken, async (req, res) => {
   }
 })
 
-// 2FA Routes
-
-// Настройка 2FA - получение QR кода
 router.post(
   '/auth/2fa/setup',
   requireAccessToken,
@@ -289,7 +273,6 @@ router.post(
   },
 )
 
-// Включение 2FA после верификации
 router.post(
   '/auth/2fa/enable',
   requireAccessToken,
@@ -311,7 +294,6 @@ router.post(
   },
 )
 
-// Отключение 2FA
 router.post(
   '/auth/2fa/disable',
   requireAccessToken,
@@ -332,7 +314,6 @@ router.post(
   },
 )
 
-// Проверка 2FA токена (для отдельной верификации)
 router.post(
   '/auth/2fa/verify',
   requireAccessToken,
@@ -361,7 +342,7 @@ router.post(
   },
 )
 
-// Получить статус 2FA
+
 router.get('/auth/2fa/status', requireAccessToken, async (req, res) => {
   try {
     const userId = req.userId
